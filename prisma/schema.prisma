@@ -1,0 +1,82 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL") // Opcional: para usar com Prisma Migrate, se tiver um banco de dados de desenvolvimento separado
+}
+
+// Modelo para o usuário do sistema
+model User {
+  id        String    @id @default(uuid()) // ID único para o usuário
+  email     String    @unique // Email, deve ser único para cada usuário
+  name      String?   // Nome do usuário (opcional)
+  password  String    // Senha do usuário (hash)
+  role      UserRole  @default(COMUM) // Papel do usuário para controle de acesso
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  // Relações
+  // Um usuário pode ter muitas ordens de serviço criadas por ele
+  createdServiceOrders ServiceOrder[] @relation("CreatedBy")
+  // Um usuário pode ser responsável por muitas ordens de serviço
+  assignedServiceOrders ServiceOrder[] @relation("AssignedTo")
+}
+
+// Enum para os papéis de usuário, para controle de acesso (RBAC - Role-Based Access Control)
+enum UserRole {
+  ADMIN
+  GESTOR_SUPRIMENTOS
+  COMPRADOR
+  GESTOR_MANUTENCAO
+  TRIPULACAO
+  ALMOXARIFADO
+  COMUM
+}
+
+// Modelo para a Ordem de Serviço (OS)
+model ServiceOrder {
+  id            String    @id @default(uuid()) // ID único da OS
+  title         String    // Título/Assunto da OS
+  description   String?   // Descrição detalhada do serviço
+  status        OrderStatus @default(PENDENTE) // Status atual da OS
+  priority      Priority    @default(MEDIA) // Prioridade da OS
+  ship          String    // Navio de origem da solicitação (ex: "StarNav Alpha")
+  location      String?   // Local específico no navio (ex: "Motor Room", "Bridge")
+  requestedAt   DateTime  @default(now()) // Data e hora da solicitação
+  dueDate       DateTime? // Prazo para conclusão (opcional)
+  completedAt   DateTime? // Data e hora da conclusão (se houver)
+
+  // Relações com o modelo User
+  createdBy     User      @relation("CreatedBy", fields: [createdById], references: [id])
+  createdById   String    // ID do usuário que criou a OS
+
+  assignedTo    User?     @relation("AssignedTo", fields: [assignedToId], references: [id])
+  assignedToId  String?   // ID do usuário ou setor responsável (opcional)
+
+  // Anexos, comentários, etc. podem ser modelos separados relacionados aqui
+  // ServiceOrderComments ServiceOrderComment[]
+  // ServiceOrderAttachments ServiceOrderAttachment[]
+}
+
+// Enum para os status da Ordem de Serviço
+enum OrderStatus {
+  PENDENTE
+  EM_ANALISE
+  APROVADA
+  RECUSADA
+  EM_EXECUCAO
+  AGUARDANDO_PECAS
+  CONCLUIDA
+  CANCELADA
+}
+
+// Enum para as prioridades da Ordem de Serviço
+enum Priority {
+  BAIXA
+  MEDIA
+  ALTA
+  URGENTE
+}
