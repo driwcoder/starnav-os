@@ -29,7 +29,7 @@ export default function LoginPage() {
       setError("Falha no login: Credenciais inválidas ou e-mail não autorizado.");
       console.error("Authentication error:", result.error);
     } else if (result?.ok) {
-      router.push("/");
+      router.push("/dashboard");
     }
   };
 
