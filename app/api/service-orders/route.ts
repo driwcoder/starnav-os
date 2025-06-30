@@ -4,34 +4,32 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import * as z from "zod";
-import { OrderStatus, Priority, UserRole } from "@prisma/client"; // Importa os enums do Prisma
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { OrderStatus, Priority, UserRole } from "@prisma/client";
 
-// --- Schema de Validação para a API (Zod) ---
-// Este schema deve refletir o que é esperado no corpo da requisição POST
+// Schema de Validação para a API de Criação (POST)
 const createServiceOrderSchema = z.object({
   title: z.string().min(3).max(255),
   description: z.string().optional().nullable(),
   ship: z.string().min(1),
   location: z.string().optional().nullable(),
   priority: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"]),
-  createdById: z.string().uuid("ID do criador inválido."), // ID do usuário criador
+  createdById: z.string().uuid("ID do criador inválido."),
   assignedToId: z.string().uuid("ID do responsável inválido.").optional().nullable(),
-  dueDate: z.string().datetime().optional().nullable(), // Data como string ISO 8601
+  dueDate: z.string().datetime().optional().nullable(),
 });
 
-// --- Handler para Requisições POST (Criação) ---
+// Handler para Requisições POST (Criação)
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    // 1. Proteção de Rota (Autenticação e Domínio)
     if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
       return new NextResponse("Não autorizado. Acesso restrito a funcionários StarNav.", { status: 403 });
     }
 
     const body = await request.json();
 
-    // 2. Validação dos dados de entrada com Zod
     const validatedData = createServiceOrderSchema.safeParse(body);
 
     if (!validatedData.success) {
@@ -41,13 +39,10 @@ export async function POST(request: Request) {
 
     const { title, description, ship, location, priority, createdById, assignedToId, dueDate } = validatedData.data;
 
-    // Opcional: Verifique se o createdById da requisição corresponde ao ID do usuário na sessão
-    // Isso previne que um usuário crie OSs em nome de outro.
     if (createdById !== session.user.id) {
       return new NextResponse("ID do criador não corresponde ao usuário logado.", { status: 403 });
     }
 
-    // 3. Criação da Ordem de Serviço no Banco de Dados
     const newServiceOrder = await prisma.serviceOrder.create({
       data: {
         title,
@@ -55,33 +50,31 @@ export async function POST(request: Request) {
         ship,
         location,
         priority,
-        createdBy: { connect: { id: createdById } }, // Conecta ao usuário criador
-        assignedTo: assignedToId ? { connect: { id: assignedToId } } : undefined, // Conecta ao responsável, se houver
-        dueDate: dueDate ? new Date(dueDate) : null, // Converte a string ISO para objeto Date
-        status: OrderStatus.PENDENTE, // Define o status inicial como PENDENTE
+        createdBy: { connect: { id: createdById } },
+        assignedTo: assignedToId ? { connect: { id: assignedToId } } : undefined,
+        dueDate: dueDate ? new Date(dueDate) : null,
+        status: OrderStatus.PENDENTE,
       },
     });
 
-    // 4. Resposta de Sucesso
-    return NextResponse.json(newServiceOrder, { status: 201 }); // 201 Created
+    return NextResponse.json(newServiceOrder, { status: 201 });
   } catch (error) {
     console.error("Erro ao criar Ordem de Serviço:", error);
     return new NextResponse("Erro interno do servidor ao criar Ordem de Serviço.", { status: 500 });
   }
 }
 
-// --- Handler para Requisições GET (Listagem - já implementado na página, mas pode ser uma API dedicada) ---
-export async function GET(request: Request) {
+// Handler para Requisições GET (Listagem de TODAS as OS)
+// O aviso do ESLint sobre '_request' será resolvido com esta estrutura
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function GET(_request: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    // Proteção de Rota (Autenticação e Domínio)
     if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
       return new NextResponse("Não autorizado. Acesso restrito a funcionários StarNav.", { status: 403 });
     }
 
-    // Para este exemplo, a listagem já é feita no Server Component da página
-    // Mas se precisar de uma API para listagem dinâmica ou outros filtros:
     const serviceOrders = await prisma.serviceOrder.findMany({
       orderBy: { requestedAt: "desc" },
       include: {
