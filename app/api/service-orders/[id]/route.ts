@@ -38,13 +38,19 @@ export async function GET(request: Request, { params }: { params: any }) {
         UserRole.GESTOR,
         UserRole.SUPERVISOR,
         UserRole.COORDENADOR,
-        UserRole.COMPRADOR_SERVICO,
-        UserRole.COMPRADOR_MATERIAL,
+        UserRole.COMPRADOR_JUNIOR,
+        UserRole.COMPRADOR_PLENO,
+        UserRole.COMPRADOR_SENIOR,
+        UserRole.COMANDANTE, // ✅ Incluído
+        UserRole.IMEDIATO,    // ✅ Incluído
+        UserRole.OQN,         // ✅ Incluído
+        UserRole.CHEFE_MAQUINAS, // ✅ Incluído
+        UserRole.SUB_CHEFE_MAQUINAS, // ✅ Incluído
+        UserRole.OQM,         // ✅ Incluído
         UserRole.ASSISTENTE,
         UserRole.AUXILIAR,
         UserRole.ESTAGIARIO,
       ];
-      // ✅ CORREÇÃO: Incluindo TODOS os setores válidos para visualização
       const allowedSectors = [
         UserSector.ADMINISTRACAO,
         UserSector.MANUTENCAO,
@@ -54,7 +60,7 @@ export async function GET(request: Request, { params }: { params: any }) {
         UserSector.ALMOXARIFADO,
         UserSector.RH,
         UserSector.TI,
-        UserSector.NAO_DEFINIDO, // Incluindo NAO_DEFINIDO
+        UserSector.NAO_DEFINIDO,
       ];
 
       return allowedRoles.includes(userRole) && allowedSectors.includes(userSector);
@@ -105,27 +111,34 @@ export async function PUT(request: Request, { params }: { params: any }) {
       if (!userRole || !userSector) return false;
       if (userRole === UserRole.ADMIN) return true;
 
+      // ✅ CORREÇÃO: Incluindo TODOS os novos cargos de comprador e tripulação
       const allowedEditRoles = [
         UserRole.GESTOR,
         UserRole.SUPERVISOR,
         UserRole.COORDENADOR,
-        UserRole.COMPRADOR_SERVICO,
-        UserRole.COMPRADOR_MATERIAL,
-        UserRole.ASSISTENTE, // ✅ Incluindo ASSISTENTE
-        UserRole.AUXILIAR,    // ✅ Incluindo AUXILIAR
-        UserRole.ESTAGIARIO,  // ✅ Incluindo ESTAGIARIO
+        UserRole.COMPRADOR_JUNIOR,
+        UserRole.COMPRADOR_PLENO,
+        UserRole.COMPRADOR_SENIOR,
+        UserRole.COMANDANTE,
+        UserRole.IMEDIATO,
+        UserRole.OQN,
+        UserRole.CHEFE_MAQUINAS,
+        UserRole.SUB_CHEFE_MAQUINAS,
+        UserRole.OQM,
+        UserRole.ASSISTENTE,
+        UserRole.AUXILIAR,
+        UserRole.ESTAGIARIO,
       ];
-      // ✅ CORREÇÃO: Incluindo TODOS os setores válidos para edição
       const allowedEditSectors = [
         UserSector.ADMINISTRACAO,
         UserSector.MANUTENCAO,
         UserSector.OPERACAO,
         UserSector.SUPRIMENTOS,
-        UserSector.ALMOXARIFADO,
         UserSector.TRIPULACAO,
-        UserSector.RH, // ✅ Incluindo RH
+        UserSector.ALMOXARIFADO,
+        UserSector.RH,
         UserSector.TI,
-        UserSector.NAO_DEFINIDO, // ✅ Incluindo NAO_DEFINIDO
+        UserSector.NAO_DEFINIDO,
       ];
 
       return allowedEditRoles.includes(userRole) && allowedEditSectors.includes(userSector);
@@ -141,6 +154,7 @@ export async function PUT(request: Request, { params }: { params: any }) {
     }
 
     const body = await request.json();
+
     const validatedData = updateServiceOrderSchema.safeParse(body);
 
     if (!validatedData.success) {
@@ -182,7 +196,6 @@ export async function DELETE(request: Request, { params }: { params: any }) {
 
     const session = await getServerSession(authOptions);
 
-    // Apenas ADMIN pode EXCLUIR
     if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br") || (session?.user?.role !== UserRole.ADMIN)) {
       return new NextResponse("Não autorizado. Acesso restrito a funcionários StarNav.", { status: 403 });
     }

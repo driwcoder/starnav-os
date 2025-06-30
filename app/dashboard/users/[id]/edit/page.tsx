@@ -15,21 +15,19 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { ArrowLeftIcon, FrownIcon } from "lucide-react";
-import { UserRole, UserSector } from "@prisma/client"; // Importe UserSector
+import { UserRole, UserSector } from "@prisma/client";
 
-// --- Definição do Schema de Validação com Zod ---
 const formSchema = z.object({
   name: z.string().min(2, "O nome deve ter no mínimo 2 caracteres.").max(100).optional(),
   email: z.string().email("Formato de e-mail inválido.").endsWith("@starnav.com.br", "O e-mail deve ser @starnav.com.br."),
   role: z.nativeEnum(UserRole, {
     required_error: "O papel do usuário é obrigatório.",
   }),
-  sector: z.nativeEnum(UserSector, { // Adicione validação para sector
+  sector: z.nativeEnum(UserSector, {
     required_error: "O setor do usuário é obrigatório.",
   }),
 });
 
-// --- Componente da Página ---
 export default function EditUserPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -44,8 +42,8 @@ export default function EditUserPage() {
     defaultValues: {
       name: "",
       email: "",
-      role: UserRole.ASSISTENTE, // ✅ Corrigido para um papel válido
-      sector: UserSector.NAO_DEFINIDO, // ✅ Adicionado valor padrão para setor
+      role: UserRole.ASSISTENTE,
+      sector: UserSector.NAO_DEFINIDO,
     },
   });
 
@@ -74,7 +72,7 @@ export default function EditUserPage() {
           name: data.name,
           email: data.email,
           role: data.role,
-          sector: data.sector, // Preencher o setor
+          sector: data.sector,
         });
       } catch (err: any) {
         setError(err.message || "Não foi possível carregar o usuário.");
@@ -87,7 +85,6 @@ export default function EditUserPage() {
   }, [id, form, session, status, router]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    // Verificação de permissão no submit
     if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br") || (session?.user?.role !== UserRole.ADMIN)) {
       toast.error("Você não tem permissão para realizar esta ação.");
       router.push("/dashboard");
@@ -117,7 +114,6 @@ export default function EditUserPage() {
     }
   };
 
-  // Verificações condicionais de sessão e acesso (DEPOIS DOS HOOKS)
   if (status === "loading") {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-gray-100">
@@ -225,7 +221,7 @@ export default function EditUserPage() {
               )}
             </div>
 
-            <div> {/* NOVO CAMPO PARA SETOR */}
+            <div>
               <Label htmlFor="sector">Setor do Usuário</Label>
               <Select
                 onValueChange={(value) => form.setValue("sector", value as UserSector)}

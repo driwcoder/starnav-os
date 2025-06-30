@@ -1,12 +1,12 @@
 // app/dashboard/users/page.tsx
-"use client"; // Esta página é um Client Component
+"use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation"; // Importe useSearchParams AQUI
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { UserRole } from "@prisma/client";
+import { UserRole, UserSector } from "@prisma/client";
 import {
   Table,
   TableBody,
@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SearchIcon, XIcon, Trash2Icon, FrownIcon } from "lucide-react";
+import { SearchIcon, XIcon, Trash2Icon, FrownIcon, KeyRoundIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -37,30 +37,55 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter
+} from "@/components/ui/dialog";
+
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Label } from "@/components/ui/label";
+
+
+const resetPasswordSchema = z.object({
+  newPassword: z.string().min(8, "A nova senha deve ter no mínimo 8 caracteres."),
+});
+
 
 export default function UsersPage() {
   const router = useRouter();
-  const searchParams = useSearchParams(); // ✅ OBTENHA OS PARAMS COM useSearchParams()
+  const searchParams = useSearchParams();
   const { data: session, status } = useSession();
 
   const [users, setUsers] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+  const [selectedUserForPasswordReset, setSelectedUserForPasswordReset] = useState<{ id: string; name: string | null; email: string } | null>(null);
 
-  // Obtém os parâmetros da URL de forma síncrona
+
   const query = searchParams.get("query") || "";
   const roleFilter = searchParams.get("role") || "";
+
+  const resetPasswordForm = useForm<z.infer<typeof resetPasswordSchema>>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      newPassword: "",
+    },
+  });
 
   const fetchUsers = async () => {
     setLoadingUsers(true);
     setError(null);
     try {
       if (status === "loading") return;
-      if (
-        status === "unauthenticated" ||
-        !(session?.user?.email as string)?.endsWith("@starnav.com.br") ||
-        session?.user?.role !== UserRole.ADMIN
-      ) {
+      if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br") || (session?.user?.role !== UserRole.ADMIN)) {
         router.push("/dashboard");
         toast.error("Acesso negado. Apenas administradores podem gerenciar usuários.");
         return;
@@ -128,6 +153,34 @@ export default function UsersPage() {
       toast.error("Erro de rede ao excluir usuário.");
     }
   };
+
+  const handleResetPassword = async (values: z.infer<typeof resetPasswordSchema>) => {
+    if (!selectedUserForPasswordReset) return;
+
+    try {
+      const response = await fetch(`/api/users/${selectedUserForPasswordReset.id}/password`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        toast.error(errorData.message || "Erro ao redefinir a senha.");
+        return;
+      }
+
+      toast.success(`Senha de ${selectedUserForPasswordReset.name || selectedUserForPasswordReset.email} redefinida com sucesso!`);
+      setIsResetPasswordModalOpen(false);
+      resetPasswordForm.reset();
+    } catch (err) {
+      console.error("Erro ao redefinir senha:", err);
+      toast.error("Erro de rede ao redefinir senha.");
+    }
+  };
+
 
   if (status === "loading") {
     return (
@@ -232,6 +285,7 @@ export default function UsersPage() {
                 <TableHead>Nome</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Papel</TableHead>
+                <TableHead>Setor</TableHead>
                 <TableHead>Criado Em</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -243,12 +297,65 @@ export default function UsersPage() {
                   <TableCell>{user.name || "N/A"}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell><span className="font-semibold">{user.role.replace(/_/g, ' ')}</span></TableCell>
+                  <TableCell><span className="font-semibold">{user.sector.replace(/_/g, ' ')}</span></TableCell>
                   <TableCell>{formatDate(user.createdAt)}</TableCell>
-                  <TableCell className="text-right space-x-2 flex items-center justify-end"> {/* ✅ Flexbox para alinhar botões */}
+                  <TableCell className="text-right space-x-2 flex items-center justify-end">
                     <Link href={`/dashboard/users/${user.id}/edit`}>
                       <Button variant="outline" size="sm">Editar</Button>
                     </Link>
-                    {/* Botão de Excluir com Diálogo de Confirmação */}
+                    {/* Botão de Redefinir Senha */}
+                    <Dialog open={isResetPasswordModalOpen && selectedUserForPasswordReset?.id === user.id} onOpenChange={(open) => {
+                      setIsResetPasswordModalOpen(open);
+                      if (!open) resetPasswordForm.reset(); // Reseta o form ao fechar
+                    }}>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                          onClick={() => {
+                            setSelectedUserForPasswordReset(user);
+                            setIsResetPasswordModalOpen(true);
+                          }}
+                        >
+                          <KeyRoundIcon className="h-4 w-4" /> Senha
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Redefinir Senha para {selectedUserForPasswordReset?.name || selectedUserForPasswordReset?.email}</DialogTitle>
+                          <DialogDescription>
+                            Digite a nova senha para este usuário.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={resetPasswordForm.handleSubmit(handleResetPassword)} className="grid gap-4 py-4">
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="newPassword" className="text-right">
+                              Nova Senha
+                            </Label>
+                            <Input
+                              id="newPassword"
+                              type="password"
+                              className="col-span-3"
+                              {...resetPasswordForm.register("newPassword")}
+                            />
+                          </div>
+                          {resetPasswordForm.formState.errors.newPassword && (
+                            <p className="text-sm text-red-600 mt-1 col-span-4 text-right">
+                              {resetPasswordForm.formState.errors.newPassword.message}
+                            </p>
+                          )}
+                          <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setIsResetPasswordModalOpen(false)}>Cancelar</Button>
+                            <Button type="submit" disabled={resetPasswordForm.formState.isSubmitting}>
+                              {resetPasswordForm.formState.isSubmitting ? "Redefinindo..." : "Redefinir"}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Botão de Excluir */}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="destructive" size="sm" className="flex items-center gap-2">

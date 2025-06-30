@@ -58,31 +58,40 @@ export default function EditServiceOrderPage() {
     },
   });
 
-  // ✅ CORREÇÃO: Função auxiliar para verificar permissão para EDIÇÃO (mais restrita)
+  // ✅ CORREÇÃO: Função auxiliar para verificar permissão para EDIÇÃO
   const hasEditPermission = (userRole: UserRole | undefined, userSector: UserSector | undefined) => {
     if (!userRole || !userSector) return false;
     if (userRole === UserRole.ADMIN) return true;
 
+    // ✅ CORREÇÃO: Incluindo TODOS os novos cargos de comprador e tripulação
     const allowedEditRoles = [
       UserRole.GESTOR,
       UserRole.SUPERVISOR,
       UserRole.COORDENADOR,
-      UserRole.COMPRADOR_SERVICO,
-      UserRole.COMPRADOR_MATERIAL,
+      UserRole.COMPRADOR_JUNIOR,
+      UserRole.COMPRADOR_PLENO,
+      UserRole.COMPRADOR_SENIOR,
+      UserRole.COMANDANTE,
+      UserRole.IMEDIATO,
+      UserRole.OQN,
+      UserRole.CHEFE_MAQUINAS,
+      UserRole.SUB_CHEFE_MAQUINAS,
+      UserRole.OQM,
       UserRole.ASSISTENTE,
       UserRole.AUXILIAR,
       UserRole.ESTAGIARIO,
     ];
+    // ✅ CORREÇÃO: Incluindo TODOS os setores válidos para edição
     const allowedEditSectors = [
-      UserSector.ADMINISTRACAO, // ✅ Incluindo ADMINISTRACAO
+      UserSector.ADMINISTRACAO,
       UserSector.MANUTENCAO,
       UserSector.OPERACAO,
       UserSector.SUPRIMENTOS,
-      UserSector.ALMOXARIFADO,
       UserSector.TRIPULACAO,
-      UserSector.RH, // ✅ Incluindo RH
+      UserSector.ALMOXARIFADO,
+      UserSector.RH,
       UserSector.TI,
-      UserSector.NAO_DEFINIDO, // ✅ Incluindo NAO_DEFINIDO
+      UserSector.NAO_DEFINIDO,
     ];
 
     return allowedEditRoles.includes(userRole) && allowedEditSectors.includes(userSector);

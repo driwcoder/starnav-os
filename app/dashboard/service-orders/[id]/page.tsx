@@ -44,26 +44,34 @@ export default function ServiceOrderDetailsPage() {
     if (!userRole || !userSector) return false;
     if (userRole === UserRole.ADMIN) return true;
 
+    // ✅ CORREÇÃO: Incluindo TODOS os novos cargos de comprador e tripulação
     const allowedRoles = [
       UserRole.GESTOR,
       UserRole.SUPERVISOR,
       UserRole.COORDENADOR,
-      UserRole.COMPRADOR_SERVICO,
-      UserRole.COMPRADOR_MATERIAL,
+      UserRole.COMPRADOR_JUNIOR,
+      UserRole.COMPRADOR_PLENO,
+      UserRole.COMPRADOR_SENIOR,
+      UserRole.COMANDANTE,
+      UserRole.IMEDIATO,
+      UserRole.OQN,
+      UserRole.CHEFE_MAQUINAS,
+      UserRole.SUB_CHEFE_MAQUINAS,
+      UserRole.OQM,
       UserRole.ASSISTENTE,
       UserRole.AUXILIAR,
       UserRole.ESTAGIARIO,
     ];
     const allowedSectors = [
-      UserSector.ADMINISTRACAO, // Para o próprio ADMIN
+      UserSector.ADMINISTRACAO,
       UserSector.MANUTENCAO,
       UserSector.OPERACAO,
       UserSector.SUPRIMENTOS,
       UserSector.TRIPULACAO,
       UserSector.ALMOXARIFADO,
-      UserSector.RH, // ✅ Incluindo RH
+      UserSector.RH,
       UserSector.TI,
-      UserSector.NAO_DEFINIDO, // ✅ Incluindo NAO_DEFINIDO (se houver usuários sem setor especificado)
+      UserSector.NAO_DEFINIDO,
     ];
 
     return allowedRoles.includes(userRole) && allowedSectors.includes(userSector);

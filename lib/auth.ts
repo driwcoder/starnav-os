@@ -3,7 +3,7 @@ import { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { UserRole, UserSector } from "@prisma/client"; // ✅ Importe UserSector
+import { UserRole, UserSector } from "@prisma/client";
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -42,13 +42,12 @@ export const authOptions: AuthOptions = {
           return null;
         }
 
-        // ✅ Retorne o role e o sector do usuário aqui!
         return {
           id: user.id,
           name: user.name,
           email: user.email,
           role: user.role,
-          sector: user.sector, // ✅ Adiciona o sector
+          sector: user.sector,
         };
       },
     }),
@@ -65,7 +64,7 @@ export const authOptions: AuthOptions = {
         token.id = user.id;
         token.email = user.email;
         token.role = (user as any).role;
-        token.sector = (user as any).sector; // ✅ Adiciona o sector ao token
+        token.sector = (user as any).sector;
       }
       return token;
     },
@@ -74,7 +73,7 @@ export const authOptions: AuthOptions = {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
         session.user.role = token.role as UserRole;
-        session.user.sector = token.sector as UserSector; // ✅ Adiciona o sector à sessão
+        session.user.sector = token.sector as UserSector;
       }
       return session;
     },

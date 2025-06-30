@@ -15,8 +15,8 @@ model User {
   email     String    @unique
   name      String?
   password  String
-  role      UserRole  @default(ASSISTENTE) // Cargo do usuário (ADMIN, GESTOR, COORDENADOR, etc.)
-  sector    UserSector @default(NAO_DEFINIDO) // Setor do usuário (MANUTENCAO, SUPRIMENTOS, etc.)
+  role      UserRole  @default(ASSISTENTE) // Cargo do usuário
+  sector    UserSector @default(NAO_DEFINIDO) // Setor do usuário
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   // Relações
@@ -24,33 +24,40 @@ model User {
   assignedServiceOrders ServiceOrder[] @relation("AssignedTo")
 }
 
-// Enum para os CARGOS do usuário (ex: Gestor, Coordenador, etc.)
+// Enum para os CARGOS do usuário
 enum UserRole {
   ADMIN
   GESTOR
   SUPERVISOR
   COORDENADOR
-  COMPRADOR_SERVICO // NOVO CARGO
-  COMPRADOR_MATERIAL // NOVO CARGO
+  COMPRADOR_JUNIOR // NOVO CARGO
+  COMPRADOR_PLENO // NOVO CARGO
+  COMPRADOR_SENIOR // NOVO CARGO
+  COMANDANTE
+  IMEDIATO
+  OQN
+  CHEFE_MAQUINAS
+  SUB_CHEFE_MAQUINAS
+  OQM
   ASSISTENTE
   AUXILIAR
   ESTAGIARIO
 }
 
-// NOVO ENUM: Setor do usuário (ex: Manutenção, Suprimentos, etc.)
+// Enum: Setor do usuário
 enum UserSector {
   ADMINISTRACAO
   MANUTENCAO
   OPERACAO
   SUPRIMENTOS
-  TRIPULACAO
   ALMOXARIFADO
   RH
-  TI // NOVO SETOR
+  TI
+  TRIPULACAO
   NAO_DEFINIDO
 }
 
-// Modelo para a Ordem de Serviço (OS)
+// Modelo para a Ordem de Serviço (OS) - Mantido inalterado
 model ServiceOrder {
   id                 String         @id @default(uuid())
   title              String
@@ -85,7 +92,7 @@ model ServiceOrder {
   assignedToId       String?
 }
 
-// Enum para os status da Ordem de Serviço
+// Enums OrderStatus, Priority, SolutionType - Mantidos inalterados
 enum OrderStatus {
   PENDENTE
   EM_ANALISE
@@ -100,7 +107,6 @@ enum OrderStatus {
   CANCELADA
 }
 
-// Enum para as prioridades da Ordem de Serviço
 enum Priority {
   BAIXA
   MEDIA
@@ -108,7 +114,6 @@ enum Priority {
   URGENTE
 }
 
-// Enum: Tipo de Solução para a OS
 enum SolutionType {
   INTERNA
   TERCEIRIZADA

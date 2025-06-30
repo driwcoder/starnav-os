@@ -4,56 +4,83 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import * as z from "zod";
-import { UserRole } from "@prisma/client";
+import { UserRole, UserSector } from "@prisma/client";
 
-// Schema de validação para o ID (comum para GET e PUT)
 const idSchema = z.string().uuid("ID de usuário inválido.");
 
-// Schema de Validação para a API de Atualização (PUT)
 const updateUserSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   email: z.string().email("Formato de e-mail inválido.").endsWith("@starnav.com.br", "O e-mail deve ser @starnav.com.br.").optional(),
   role: z.nativeEnum(UserRole, {
     required_error: "O papel do usuário é obrigatório.",
   }).optional(),
+  sector: z.nativeEnum(UserSector, {
+    required_error: "O setor do usuário é obrigatório.",
+  }).optional(),
 });
 
-// Handler para Requisições GET por ID
 export async function GET(request: Request, { params }: { params: any }) {
   try {
     const actualParams = await params;
     const id = actualParams.id as string;
 
-    // 1. Proteção de Rota (Autenticação e Permissão de ADMIN)
     const session = await getServerSession(authOptions);
-    if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
+    // ✅ CORREÇÃO: Função auxiliar para verificar permissão para VISUALIZAÇÃO
+    const hasViewPermission = (userRole: UserRole | undefined, userSector: UserSector | undefined) => {
+      if (!userRole || !userSector) return false;
+      if (userRole === UserRole.ADMIN) return true;
+
+      const allowedRoles = [
+        UserRole.GESTOR,
+        UserRole.SUPERVISOR,
+        UserRole.COORDENADOR,
+        UserRole.COMPRADOR_JUNIOR, // ✅ Novo cargo
+        UserRole.COMPRADOR_PLENO, // ✅ Novo cargo
+        UserRole.COMPRADOR_SENIOR, // ✅ Novo cargo
+        UserRole.COMANDANTE,
+        UserRole.IMEDIATO,
+        UserRole.OQN,
+        UserRole.CHEFE_MAQUINAS,
+        UserRole.SUB_CHEFE_MAQUINAS,
+        UserRole.OQM,
+        UserRole.ASSISTENTE,
+        UserRole.AUXILIAR,
+        UserRole.ESTAGIARIO,
+      ];
+      // ✅ CORREÇÃO: Incluindo TODOS os setores válidos para visualização
+      const allowedSectors = [
+        UserSector.ADMINISTRACAO,
+        UserSector.MANUTENCAO,
+        UserSector.OPERACAO,
+        UserSector.SUPRIMENTOS,
+        UserSector.TRIPULACAO,
+        UserSector.ALMOXARIFADO,
+        UserSector.RH,
+        UserSector.TI,
+        UserSector.NAO_DEFINIDO,
+      ];
+
+      return allowedRoles.includes(userRole) && allowedSectors.includes(userSector);
+    };
+
+    if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br") || !hasViewPermission(session.user?.role, session.user?.sector)) {
       return new NextResponse("Não autorizado. Acesso restrito a funcionários StarNav.", { status: 403 });
     }
-    const currentUser = await prisma.user.findUnique({
-      where: { email: session.user.email as string },
-      select: { role: true },
-    });
-    if (currentUser?.role !== UserRole.ADMIN) {
-      return new NextResponse("Acesso negado. Apenas administradores podem visualizar usuários.", { status: 403 });
-    }
 
-    // 2. Validação do ID
     const validatedId = idSchema.safeParse(id);
     if (!validatedId.success) {
         return new NextResponse("ID de usuário inválido.", { status: 400 });
     }
 
-    // 3. Busca o Usuário específico no Banco de Dados
     const user = await prisma.user.findUnique({
       where: { id: validatedId.data },
-      select: { id: true, name: true, email: true, role: true, createdAt: true, updatedAt: true },
+      select: { id: true, name: true, email: true, role: true, sector: true, createdAt: true, updatedAt: true },
     });
 
     if (!user) {
       return new NextResponse("Usuário não encontrado.", { status: 404 });
     }
 
-    // 4. Resposta de Sucesso
     return NextResponse.json(user, { status: 200 });
   } catch (error) {
     console.error("Erro ao buscar usuário por ID:", error);
@@ -61,26 +88,54 @@ export async function GET(request: Request, { params }: { params: any }) {
   }
 }
 
-// Handler para Requisições PUT (Atualização de Usuário)
 export async function PUT(request: Request, { params }: { params: any }) {
   try {
     const actualParams = await params;
     const id = actualParams.id as string;
 
-    // 1. Proteção de Rota (Autenticação e Permissão de ADMIN)
     const session = await getServerSession(authOptions);
-    if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
+    // ✅ CORREÇÃO: Função auxiliar para verificar permissão para EDIÇÃO
+    const hasEditPermission = (userRole: UserRole | undefined, userSector: UserSector | undefined) => {
+      if (!userRole || !userSector) return false;
+      if (userRole === UserRole.ADMIN) return true;
+
+      const allowedEditRoles = [
+        UserRole.GESTOR,
+        UserRole.SUPERVISOR,
+        UserRole.COORDENADOR,
+        UserRole.COMPRADOR_JUNIOR, // ✅ Novo cargo
+        UserRole.COMPRADOR_PLENO, // ✅ Novo cargo
+        UserRole.COMPRADOR_SENIOR, // ✅ Novo cargo
+        UserRole.COMANDANTE, // Tripulação também pode editar certas coisas (se o fluxo permitir)
+        UserRole.IMEDIATO,
+        UserRole.OQN,
+        UserRole.CHEFE_MAQUINAS,
+        UserRole.SUB_CHEFE_MAQUINAS,
+        UserRole.OQM,
+        UserRole.ASSISTENTE,
+        UserRole.AUXILIAR,
+        UserRole.ESTAGIARIO,
+      ];
+      // ✅ CORREÇÃO: Incluindo TODOS os setores válidos para edição
+      const allowedEditSectors = [
+        UserSector.ADMINISTRACAO,
+        UserSector.MANUTENCAO,
+        UserSector.OPERACAO,
+        UserSector.SUPRIMENTOS,
+        UserSector.TRIPULACAO, // Tripulação pode editar suas próprias OSs
+        UserSector.ALMOXARIFADO,
+        UserSector.RH,
+        UserSector.TI,
+        UserSector.NAO_DEFINIDO,
+      ];
+
+      return allowedEditRoles.includes(userRole) && allowedEditSectors.includes(userSector);
+    };
+
+    if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br") || !hasEditPermission(session.user?.role, session.user?.sector)) {
       return new NextResponse("Não autorizado. Acesso restrito a funcionários StarNav.", { status: 403 });
     }
-    const currentUser = await prisma.user.findUnique({
-      where: { email: session.user.email as string },
-      select: { role: true },
-    });
-    if (currentUser?.role !== UserRole.ADMIN) {
-      return new NextResponse("Acesso negado. Apenas administradores podem editar usuários.", { status: 403 });
-    }
-
-    // 2. Validação do ID
+    
     const validatedId = idSchema.safeParse(id);
     if (!validatedId.success) {
         return new NextResponse("ID de usuário inválido para atualização.", { status: 400 });
@@ -88,7 +143,6 @@ export async function PUT(request: Request, { params }: { params: any }) {
 
     const body = await request.json();
 
-    // 3. Validação dos dados de entrada com Zod
     const validatedData = updateUserSchema.safeParse(body);
 
     if (!validatedData.success) {
@@ -103,8 +157,9 @@ export async function PUT(request: Request, { params }: { params: any }) {
       data: {
         ...dataToUpdate,
         role: dataToUpdate.role as UserRole | undefined,
+        sector: dataToUpdate.sector as UserSector | undefined, // Incluir o setor na atualização
       },
-      select: { id: true, name: true, email: true, role: true, createdAt: true, updatedAt: true },
+      select: { id: true, name: true, email: true, role: true, sector: true, createdAt: true, updatedAt: true },
     });
 
     return NextResponse.json(updatedUser, { status: 200 });
@@ -114,7 +169,7 @@ export async function PUT(request: Request, { params }: { params: any }) {
   }
 }
 
-// Handler para Requisições DELETE (Exclusão de Usuário)
+// Handler para Requisições DELETE (Exclusão)
 export async function DELETE(request: Request, { params }: { params: any }) {
   try {
     const actualParams = await params;
@@ -122,20 +177,19 @@ export async function DELETE(request: Request, { params }: { params: any }) {
 
     const session = await getServerSession(authOptions);
 
-    if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
+    if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br") || (session?.user?.role !== UserRole.ADMIN)) {
       return new NextResponse("Não autorizado. Acesso restrito a funcionários StarNav.", { status: 403 });
     }
 
-    const currentUser = await prisma.user.findUnique({ // Adicionado para verificar o role do admin logado
+    const currentUser = await prisma.user.findUnique({
       where: { email: session.user.email as string },
-      select: { id: true, role: true }, // Obter também o ID do usuário logado
+      select: { id: true, role: true },
     });
 
     if (currentUser?.role !== UserRole.ADMIN) {
       return new NextResponse("Acesso negado. Apenas administradores podem excluir usuários.", { status: 403 });
     }
 
-    // Não permite que o admin logado exclua a si mesmo
     if (currentUser.id === id) {
         return new NextResponse("Você não pode excluir sua própria conta.", { status: 403 });
     }
