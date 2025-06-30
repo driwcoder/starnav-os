@@ -1,21 +1,41 @@
 // app/api/register/route.ts
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma"; // Importe o Prisma Client
-import bcrypt from "bcryptjs"; // Importe o bcryptjs
-import { UserRole } from "@prisma/client"; // Importe o enum UserRole do Prisma
+import { getServerSession } from "next-auth"; // getServerSession (não usado diretamente no POST)
+import { authOptions } from "@/lib/auth"; // authOptions (não usado diretamente no POST)
+import prisma from "@/lib/prisma";
+import bcrypt from "bcryptjs";
+import * as z from "zod";
+import { UserRole, UserSector } from "@prisma/client";
 
+// --- Schema de Validação para a API (Zod) ---
+const createUserSchema = z.object({
+  name: z.string().min(2).max(100).optional(),
+  email: z.string().email("Formato de e-mail inválido.").endsWith("@starnav.com.br", "O e-mail deve ser @starnav.com.br."),
+  password: z.string().min(8, "A senha deve ter no mínimo 8 caracteres."),
+  role: z.nativeEnum(UserRole, {
+    required_error: "O papel do usuário é obrigatório.",
+  }),
+  sector: z.nativeEnum(UserSector, {
+    required_error: "O setor do usuário é obrigatório.",
+  }),
+});
+
+// Handler para Requisições POST (Criação de Usuário)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password, name, role } = body;
+    const validatedData = createUserSchema.safeParse(body);
 
-    if (!email || !password) {
-      return new NextResponse("Email e senha são obrigatórios", { status: 400 });
+    if (!validatedData.success) {
+      console.error("Erro de validação na API de registro:", validatedData.error.errors);
+      return new NextResponse("Dados inválidos: " + JSON.stringify(validatedData.error.errors), { status: 400 });
     }
 
-    // Verifica o sufixo do e-mail para registro
-    if (!email.endsWith("@starnav.com.br")) {
-      return new NextResponse("Registro permitido apenas para emails @starnav.com.br", { status: 403 });
+    const { name, email, password, role, sector } = validatedData.data;
+
+    // Impedir que o role ADMIN seja definido por registro público
+    if (role === UserRole.ADMIN) {
+      return new NextResponse("Não é possível registrar como ADMINISTRADOR diretamente. Contate um administrador existente.", { status: 403 });
     }
 
     // Verifica se o usuário já existe
@@ -24,34 +44,38 @@ export async function POST(request: Request) {
     });
 
     if (existingUser) {
-      return new NextResponse("Usuário com este email já existe", { status: 409 });
+      return new NextResponse("Usuário com este email já existe.", { status: 409 });
     }
 
     // Criptografa a senha antes de salvar
-    const hashedPassword = await bcrypt.hash(password, 10); // 10 é o saltRounds, um bom valor
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Define o papel do usuário (role). Garante que o valor venha do enum.
-    const userRole: UserRole = role && Object.values(UserRole).includes(role) ? role : UserRole.COMUM;
-
-
+    // Criação do Usuário no Banco de Dados
     const newUser = await prisma.user.create({
       data: {
+        name,
         email,
         password: hashedPassword,
-        name: name || "Novo Usuário", // Nome opcional, com default
-        role: userRole,
+        role,
+        sector,
       },
     });
 
-    // Retorna um objeto de usuário simplificado, sem a senha
+    // Resposta de Sucesso (sem a senha)
     return NextResponse.json({
       id: newUser.id,
-      email: newUser.email,
       name: newUser.name,
+      email: newUser.email,
       role: newUser.role,
-    }, { status: 201 }); // 201 Created
+      sector: newUser.sector,
+    }, { status: 201 });
   } catch (error) {
-    console.error("Erro no registro de usuário:", error);
-    return new NextResponse("Erro interno do servidor", { status: 500 });
+    console.error("Erro ao registrar usuário:", error);
+    return new NextResponse("Erro interno do servidor ao registrar usuário.", { status: 500 });
   }
+}
+
+// O GET handler para /api/users está em app/api/users/route.ts, não aqui.
+export async function GET(_request: Request) {
+  return new NextResponse("Método não permitido.", { status: 405 });
 }

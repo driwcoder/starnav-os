@@ -5,15 +5,18 @@ import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import * as z from "zod";
-import { UserRole } from "@prisma/client";
+import { UserRole, UserSector } from "@prisma/client";
 
 // Schema de Validação para a API (Zod)
 const createUserSchema = z.object({
   name: z.string().min(2).max(100).optional(),
-  email: z.string().email().endsWith("@starnav.com.br", "O e-mail deve ser @starnav.com.br."),
-  password: z.string().min(8),
+  email: z.string().email("Formato de e-mail inválido.").endsWith("@starnav.com.br", "O e-mail deve ser @starnav.com.br."),
+  password: z.string().min(8, "A senha deve ter no mínimo 8 caracteres."),
   role: z.nativeEnum(UserRole, {
     required_error: "O papel do usuário é obrigatório.",
+  }),
+  sector: z.nativeEnum(UserSector, {
+    required_error: "O setor do usuário é obrigatório.",
   }),
 });
 
@@ -22,19 +25,23 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
 
+    // Proteção de Rota: Apenas ADMIN pode criar usuários
+    // Primeiramente, verifica se há sessão e email autorizado
     if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
       return new NextResponse("Não autorizado. Acesso restrito a funcionários StarNav.", { status: 403 });
     }
+
+    // Depois, busca o usuário completo para verificar o papel
     const currentUser = await prisma.user.findUnique({
       where: { email: session.user.email as string },
       select: { role: true },
     });
+
     if (currentUser?.role !== UserRole.ADMIN) {
       return new NextResponse("Acesso negado. Apenas administradores podem criar usuários.", { status: 403 });
     }
 
     const body = await request.json();
-
     const validatedData = createUserSchema.safeParse(body);
 
     if (!validatedData.success) {
@@ -42,10 +49,11 @@ export async function POST(request: Request) {
       return new NextResponse("Dados inválidos: " + JSON.stringify(validatedData.error.errors), { status: 400 });
     }
 
-    const { name, email, password, role } = validatedData.data;
+    const { name, email, password, role, sector } = validatedData.data;
 
-    if (email === process.env.ROOT_ADMIN_EMAIL) { // Protege o admin root de ser criado via API
-      return new NextResponse("Não é possível criar o usuário ROOT_ADMIN_EMAIL via API.", { status: 403 });
+    // Impede a criação de um novo ADMIN via registro público se role for ADMIN
+    if (role === UserRole.ADMIN && session.user.role !== UserRole.ADMIN) { // Apenas um ADMIN real pode criar outro ADMIN
+      return new NextResponse("Não é possível criar o usuário ADMINISTRADOR sem permissão de administrador ROOT.", { status: 403 });
     }
 
     const existingUser = await prisma.user.findUnique({
@@ -64,6 +72,7 @@ export async function POST(request: Request) {
         email,
         password: hashedPassword,
         role,
+        sector,
       },
     });
 
@@ -72,6 +81,7 @@ export async function POST(request: Request) {
       name: newUser.name,
       email: newUser.email,
       role: newUser.role,
+      sector: newUser.sector,
     }, { status: 201 });
   } catch (error) {
     console.error("Erro ao criar usuário:", error);
@@ -117,7 +127,7 @@ export async function GET(_request: Request) {
     const users = await prisma.user.findMany({
       where: whereClause,
       orderBy: { createdAt: "asc" },
-      select: { id: true, name: true, email: true, role: true, createdAt: true, updatedAt: true },
+      select: { id: true, name: true, email: true, role: true, sector: true, createdAt: true, updatedAt: true },
     });
 
     return NextResponse.json(users, { status: 200 });

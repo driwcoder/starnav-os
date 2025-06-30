@@ -4,10 +4,23 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import * as z from "zod";
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, Priority, UserRole, UserSector } from "@prisma/client";
 
-// Schema de validação para o ID (se necessário)
+// Schema de validação para o ID (comum para GET e PUT)
 const idSchema = z.string().uuid("ID inválido.");
+
+// Schema de Validação para a API de Atualização (PUT)
+const updateServiceOrderSchema = z.object({
+  title: z.string().min(3).max(255).optional(),
+  description: z.string().optional().nullable(),
+  ship: z.string().min(1).optional(),
+  location: z.string().optional().nullable(),
+  priority: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"]).optional(),
+  assignedToId: z.string().uuid("ID do responsável inválido.").optional().nullable(),
+  dueDate: z.string().datetime().optional().nullable(),
+  status: z.enum(["PENDENTE", "EM_ANALISE", "APROVADA", "RECUSADA", "EM_EXECUCAO", "AGUARDANDO_PECAS", "CONCLUIDA", "CANCELADA", "PLANEJADA", "AGUARDANDO_SUPRIMENTOS", "CONTRATADA"]).optional(),
+  completedAt: z.string().datetime().optional().nullable(),
+});
 
 // Handler para Requisições GET por ID
 export async function GET(request: Request, { params }: { params: any }) {
@@ -15,19 +28,47 @@ export async function GET(request: Request, { params }: { params: any }) {
     const actualParams = await params;
     const id = actualParams.id as string;
 
-    // 1. Proteção de Rota (Autenticação e Domínio)
     const session = await getServerSession(authOptions);
-    if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
+    // ✅ CORREÇÃO: Função auxiliar para verificar permissão para VISUALIZAÇÃO
+    const hasViewPermission = (userRole: UserRole | undefined, userSector: UserSector | undefined) => {
+      if (!userRole || !userSector) return false;
+      if (userRole === UserRole.ADMIN) return true;
+
+      const allowedRoles = [
+        UserRole.GESTOR,
+        UserRole.SUPERVISOR,
+        UserRole.COORDENADOR,
+        UserRole.COMPRADOR_SERVICO,
+        UserRole.COMPRADOR_MATERIAL,
+        UserRole.ASSISTENTE,
+        UserRole.AUXILIAR,
+        UserRole.ESTAGIARIO,
+      ];
+      // ✅ CORREÇÃO: Incluindo TODOS os setores válidos para visualização
+      const allowedSectors = [
+        UserSector.ADMINISTRACAO,
+        UserSector.MANUTENCAO,
+        UserSector.OPERACAO,
+        UserSector.SUPRIMENTOS,
+        UserSector.TRIPULACAO,
+        UserSector.ALMOXARIFADO,
+        UserSector.RH,
+        UserSector.TI,
+        UserSector.NAO_DEFINIDO, // Incluindo NAO_DEFINIDO
+      ];
+
+      return allowedRoles.includes(userRole) && allowedSectors.includes(userSector);
+    };
+
+    if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br") || !hasViewPermission(session.user?.role, session.user?.sector)) {
       return new NextResponse("Não autorizado. Acesso restrito a funcionários StarNav.", { status: 403 });
     }
 
-    // Opcional: Validação do ID
     const validatedId = idSchema.safeParse(id);
     if (!validatedId.success) {
-        return new NextResponse("ID da Ordem de Serviço inválido.", { status: 400 });
+        return new NextResponse("ID de Ordem de Serviço inválido.", { status: 400 });
     }
 
-    // 2. Busca a Ordem de Serviço específica no Banco de Dados
     const serviceOrder = await prisma.serviceOrder.findUnique({
       where: { id: validatedId.data },
       include: {
@@ -44,7 +85,6 @@ export async function GET(request: Request, { params }: { params: any }) {
       return new NextResponse("Ordem de Serviço não encontrada.", { status: 404 });
     }
 
-    // 3. Resposta de Sucesso
     return NextResponse.json(serviceOrder, { status: 200 });
   } catch (error) {
     console.error("Erro ao buscar Ordem de Serviço por ID:", error);
@@ -52,20 +92,7 @@ export async function GET(request: Request, { params }: { params: any }) {
   }
 }
 
-
 // Handler para Requisições PUT (Atualização)
-const updateServiceOrderSchema = z.object({
-  title: z.string().min(3).max(255).optional(),
-  description: z.string().optional().nullable(),
-  ship: z.string().min(1).optional(),
-  location: z.string().optional().nullable(),
-  priority: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"]).optional(),
-  assignedToId: z.string().uuid("ID do responsável inválido.").optional().nullable(),
-  dueDate: z.string().datetime().optional().nullable(),
-  status: z.enum(["PENDENTE", "EM_ANALISE", "APROVADA", "RECUSADA", "EM_EXECUCAO", "AGUARDANDO_PECAS", "CONCLUIDA", "CANCELADA"]).optional(),
-  completedAt: z.string().datetime().optional().nullable(),
-});
-
 export async function PUT(request: Request, { params }: { params: any }) {
   try {
     const actualParams = await params;
@@ -73,13 +100,44 @@ export async function PUT(request: Request, { params }: { params: any }) {
 
     const session = await getServerSession(authOptions);
 
-    if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
+    // ✅ CORREÇÃO: Função auxiliar para verificar permissão para EDIÇÃO
+    const hasEditPermission = (userRole: UserRole | undefined, userSector: UserSector | undefined) => {
+      if (!userRole || !userSector) return false;
+      if (userRole === UserRole.ADMIN) return true;
+
+      const allowedEditRoles = [
+        UserRole.GESTOR,
+        UserRole.SUPERVISOR,
+        UserRole.COORDENADOR,
+        UserRole.COMPRADOR_SERVICO,
+        UserRole.COMPRADOR_MATERIAL,
+        UserRole.ASSISTENTE, // ✅ Incluindo ASSISTENTE
+        UserRole.AUXILIAR,    // ✅ Incluindo AUXILIAR
+        UserRole.ESTAGIARIO,  // ✅ Incluindo ESTAGIARIO
+      ];
+      // ✅ CORREÇÃO: Incluindo TODOS os setores válidos para edição
+      const allowedEditSectors = [
+        UserSector.ADMINISTRACAO,
+        UserSector.MANUTENCAO,
+        UserSector.OPERACAO,
+        UserSector.SUPRIMENTOS,
+        UserSector.ALMOXARIFADO,
+        UserSector.TRIPULACAO,
+        UserSector.RH, // ✅ Incluindo RH
+        UserSector.TI,
+        UserSector.NAO_DEFINIDO, // ✅ Incluindo NAO_DEFINIDO
+      ];
+
+      return allowedEditRoles.includes(userRole) && allowedEditSectors.includes(userSector);
+    };
+
+    if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br") || !hasEditPermission(session.user?.role, session.user?.sector)) {
       return new NextResponse("Não autorizado. Acesso restrito a funcionários StarNav.", { status: 403 });
     }
-
+    
     const validatedId = idSchema.safeParse(id);
     if (!validatedId.success) {
-        return new NextResponse("ID da Ordem de Serviço inválido para atualização.", { status: 400 });
+        return new NextResponse("ID de Ordem de Serviço inválido para atualização.", { status: 400 });
     }
 
     const body = await request.json();
@@ -104,18 +162,17 @@ export async function PUT(request: Request, { params }: { params: any }) {
       data: {
         ...dataToUpdate,
         dueDate: dueDate ? new Date(dueDate) : null,
-        status: status as OrderStatus | undefined, // OrderStatus é usado aqui
+        status: status ? (status as OrderStatus) : undefined,
         completedAt: actualCompletedAt,
       },
     });
 
     return NextResponse.json(updatedServiceOrder, { status: 200 });
   } catch (error) {
-    console.error("Erro ao atualizar Ordem de Serviço por ID:", error);
+    console.error("Erro ao atualizar Ordem de Serviço:", error);
     return new NextResponse("Erro interno do servidor ao atualizar Ordem de Serviço.", { status: 500 });
   }
 }
-
 
 // Handler para Requisições DELETE (Exclusão)
 export async function DELETE(request: Request, { params }: { params: any }) {
@@ -125,13 +182,14 @@ export async function DELETE(request: Request, { params }: { params: any }) {
 
     const session = await getServerSession(authOptions);
 
-    if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
+    // Apenas ADMIN pode EXCLUIR
+    if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br") || (session?.user?.role !== UserRole.ADMIN)) {
       return new NextResponse("Não autorizado. Acesso restrito a funcionários StarNav.", { status: 403 });
     }
 
     const validatedId = idSchema.safeParse(id);
     if (!validatedId.success) {
-        return new NextResponse("ID da Ordem de Serviço inválido para exclusão.", { status: 400 });
+        return new NextResponse("ID de Ordem de Serviço inválido para exclusão.", { status: 400 });
     }
 
     await prisma.serviceOrder.delete({

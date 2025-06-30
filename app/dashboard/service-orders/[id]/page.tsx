@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { UserRole, UserSector } from "@prisma/client";
 
 export default function ServiceOrderDetailsPage() {
   const router = useRouter();
@@ -38,51 +39,80 @@ export default function ServiceOrderDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchServiceOrder = async (orderId: string) => {
-      setLoading(true);
-      setError(null);
-      try {
-        if (status === "loading") return;
-        if (
-          status === "unauthenticated" ||
-          !(session?.user?.email as string)?.endsWith("@starnav.com.br")
-        ) {
+  // ✅ CORREÇÃO: Função auxiliar para verificar permissão de VISUALIZAÇÃO
+  const hasPermission = (userRole: UserRole | undefined, userSector: UserSector | undefined) => {
+    if (!userRole || !userSector) return false;
+    if (userRole === UserRole.ADMIN) return true;
+
+    const allowedRoles = [
+      UserRole.GESTOR,
+      UserRole.SUPERVISOR,
+      UserRole.COORDENADOR,
+      UserRole.COMPRADOR_SERVICO,
+      UserRole.COMPRADOR_MATERIAL,
+      UserRole.ASSISTENTE,
+      UserRole.AUXILIAR,
+      UserRole.ESTAGIARIO,
+    ];
+    const allowedSectors = [
+      UserSector.ADMINISTRACAO, // Para o próprio ADMIN
+      UserSector.MANUTENCAO,
+      UserSector.OPERACAO,
+      UserSector.SUPRIMENTOS,
+      UserSector.TRIPULACAO,
+      UserSector.ALMOXARIFADO,
+      UserSector.RH, // ✅ Incluindo RH
+      UserSector.TI,
+      UserSector.NAO_DEFINIDO, // ✅ Incluindo NAO_DEFINIDO (se houver usuários sem setor especificado)
+    ];
+
+    return allowedRoles.includes(userRole) && allowedSectors.includes(userSector);
+  };
+
+  const fetchServiceOrder = async (orderId: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (status === "loading") return;
+      if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br")) {
           toast.error("Acesso negado. Por favor, faça login.");
           router.push("/login");
           return;
-        }
-
-        const response = await fetch(`/api/service-orders/${orderId}`);
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.message || "Erro ao carregar Ordem de Serviço."
-          );
-        }
-        const data = await response.json();
-        setServiceOrder(data);
-      } catch (err: any) {
-        setError(err.message || "Não foi possível carregar a Ordem de Serviço.");
-        toast.error("Erro ao carregar OS: " + (err.message || "Erro desconhecido."));
-      } finally {
-        setLoading(false);
       }
-    };
+      if (!hasPermission(session?.user?.role, session?.user?.sector)) {
+        toast.error("Você não tem permissão para visualizar esta Ordem de Serviço.");
+        router.push("/dashboard");
+        return;
+      }
 
+      const response = await fetch(`/api/service-orders/${orderId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.message || "Erro ao carregar Ordem de Serviço."
+        );
+      }
+      const data = await response.json();
+      setServiceOrder(data);
+    } catch (err: any) {
+      setError(err.message || "Não foi possível carregar a Ordem de Serviço.");
+      toast.error("Erro ao carregar OS: " + (err.message || "Erro desconhecido."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (id && status !== "loading") {
       fetchServiceOrder(id);
     }
   }, [id, status, session, router]);
 
   const handleDelete = async () => {
-    if (
-      status === "unauthenticated" ||
-      !(session?.user?.email as string)?.endsWith("@starnav.com.br")
-    ) {
-      toast.error("Você não tem permissão para realizar esta ação.");
-      router.push("/login");
-      return;
+    if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br") || (session?.user?.role !== UserRole.ADMIN)) {
+        toast.error("Você não tem permissão para excluir esta Ordem de Serviço.");
+        router.push("/dashboard");
+        return;
     }
 
     try {
@@ -112,16 +142,13 @@ export default function ServiceOrderDetailsPage() {
     );
   }
 
-  if (
-    status === "unauthenticated" ||
-    !(session?.user?.email as string)?.endsWith("@starnav.com.br")
-  ) {
+  if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br") || !hasPermission(session?.user?.role, session?.user?.sector)) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
         <FrownIcon className="h-20 w-20 text-red-400 mb-4" />
         <h2 className="text-2xl font-bold text-red-700 mb-2">Acesso Negado</h2>
         <p className="text-gray-500 mb-6">
-          Você precisa estar logado com uma conta StarNav para acessar esta página.
+          Você não tem permissão para acessar esta página ou seu acesso é restrito.
         </p>
         <Button onClick={() => router.push("/login")}>Ir para Login</Button>
       </div>

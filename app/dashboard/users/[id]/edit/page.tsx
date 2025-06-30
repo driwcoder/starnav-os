@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"; // Importado CardDescription
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -15,16 +15,21 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { ArrowLeftIcon, FrownIcon } from "lucide-react";
-import { UserRole } from "@prisma/client";
+import { UserRole, UserSector } from "@prisma/client"; // Importe UserSector
 
+// --- Definição do Schema de Validação com Zod ---
 const formSchema = z.object({
   name: z.string().min(2, "O nome deve ter no mínimo 2 caracteres.").max(100).optional(),
   email: z.string().email("Formato de e-mail inválido.").endsWith("@starnav.com.br", "O e-mail deve ser @starnav.com.br."),
   role: z.nativeEnum(UserRole, {
     required_error: "O papel do usuário é obrigatório.",
   }),
+  sector: z.nativeEnum(UserSector, { // Adicione validação para sector
+    required_error: "O setor do usuário é obrigatório.",
+  }),
 });
 
+// --- Componente da Página ---
 export default function EditUserPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -39,12 +44,10 @@ export default function EditUserPage() {
     defaultValues: {
       name: "",
       email: "",
-      role: UserRole.COMUM,
+      role: UserRole.ASSISTENTE, // ✅ Corrigido para um papel válido
+      sector: UserSector.NAO_DEFINIDO, // ✅ Adicionado valor padrão para setor
     },
   });
-
-  // Mover as chamadas de Hooks para o topo.
-  // As verificações condicionais de sessão vêm DEPOIS das chamadas de Hooks.
 
   useEffect(() => {
     if (!id) return;
@@ -53,7 +56,7 @@ export default function EditUserPage() {
       setLoading(true);
       setError(null);
       try {
-        if (status === "loading") return; // Ainda carregando a sessão, aguarda
+        if (status === "loading") return;
         if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br") || (session?.user?.role !== UserRole.ADMIN)) {
             toast.error("Acesso negado. Por favor, faça login.");
             router.push("/login");
@@ -71,6 +74,7 @@ export default function EditUserPage() {
           name: data.name,
           email: data.email,
           role: data.role,
+          sector: data.sector, // Preencher o setor
         });
       } catch (err: any) {
         setError(err.message || "Não foi possível carregar o usuário.");
@@ -218,6 +222,28 @@ export default function EditUserPage() {
               </Select>
               {form.formState.errors.role && (
                 <p className="text-sm text-red-600 mt-1">{form.formState.errors.role.message}</p>
+              )}
+            </div>
+
+            <div> {/* NOVO CAMPO PARA SETOR */}
+              <Label htmlFor="sector">Setor do Usuário</Label>
+              <Select
+                onValueChange={(value) => form.setValue("sector", value as UserSector)}
+                value={form.watch("sector")}
+              >
+                <SelectTrigger id="sector">
+                  <SelectValue placeholder="Selecione um setor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(UserSector).map((sectorValue) => (
+                    <SelectItem key={sectorValue} value={sectorValue}>
+                      {sectorValue.replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.sector && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.sector.message}</p>
               )}
             </div>
 

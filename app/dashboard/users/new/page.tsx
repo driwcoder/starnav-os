@@ -1,7 +1,7 @@
 // app/dashboard/users/new/page.tsx
 "use client";
 
-import { useRouter } from "next/navigation"; // Removido useState que não era usado
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,8 +15,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { ArrowLeftIcon, FrownIcon } from "lucide-react";
-import { UserRole } from "@prisma/client";
+import { UserRole, UserSector } from "@prisma/client";
 
+// --- Definição do Schema de Validação com Zod ---
 const formSchema = z.object({
   name: z.string().min(2, "O nome deve ter no mínimo 2 caracteres.").max(100).optional(),
   email: z.string().email("Formato de e-mail inválido.").endsWith("@starnav.com.br", "O e-mail deve ser @starnav.com.br."),
@@ -24,8 +25,12 @@ const formSchema = z.object({
   role: z.nativeEnum(UserRole, {
     required_error: "O papel do usuário é obrigatório.",
   }),
+  sector: z.nativeEnum(UserSector, {
+    required_error: "O setor do usuário é obrigatório.",
+  }),
 });
 
+// --- Componente da Página ---
 export default function CreateUserPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -35,7 +40,8 @@ export default function CreateUserPage() {
       name: "",
       email: "",
       password: "",
-      role: UserRole.COMUM,
+      role: UserRole.ASSISTENTE,
+      sector: UserSector.NAO_DEFINIDO,
     },
   });
 
@@ -47,6 +53,7 @@ export default function CreateUserPage() {
     );
   }
 
+  // ✅ Verificação de permissão CLIENT-SIDE (para UX). A API fará a validação final.
   if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br") || (session?.user?.role !== UserRole.ADMIN)) {
     router.push("/dashboard");
     return (
@@ -60,6 +67,7 @@ export default function CreateUserPage() {
   }
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    // ✅ Verificação de sessão/permissão também no submit para casos em que o estado pode mudar
     if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       toast.error("Você não tem permissão para realizar esta ação.");
       router.push("/dashboard");
@@ -157,6 +165,28 @@ export default function CreateUserPage() {
               </Select>
               {form.formState.errors.role && (
                 <p className="text-sm text-red-600 mt-1">{form.formState.errors.role.message}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="sector">Setor do Usuário</Label>
+              <Select
+                onValueChange={(value) => form.setValue("sector", value as UserSector)}
+                value={form.watch("sector")}
+              >
+                <SelectTrigger id="sector">
+                  <SelectValue placeholder="Selecione um setor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(UserSector).map((sectorValue) => (
+                    <SelectItem key={sectorValue} value={sectorValue}>
+                      {sectorValue.replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.sector && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.sector.message}</p>
               )}
             </div>
 

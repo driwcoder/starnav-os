@@ -4,13 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -22,8 +16,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { ArrowLeftIcon, FrownIcon } from "lucide-react";
+import { OrderStatus, Priority, UserRole, UserSector } from "@prisma/client";
 
-// Reutiliza o schema de validação, mas ajusta para edição
+// --- Definição do Schema de Validação com Zod ---
 const formSchema = z.object({
   title: z.string().min(3, "O título deve ter no mínimo 3 caracteres.").max(255),
   description: z.string().optional().nullable(),
@@ -34,23 +29,17 @@ const formSchema = z.object({
   }),
   assignedToId: z.string().uuid("ID do responsável inválido.").optional().nullable(),
   dueDate: z.string().optional().nullable(),
-  status: z.enum(["PENDENTE", "EM_ANALISE", "APROVADA", "RECUSADA", "EM_EXECUCAO", "AGUARDANDO_PECAS", "CONCLUIDA", "CANCELADA"], {
+  status: z.enum(["PENDENTE", "EM_ANALISE", "APROVADA", "RECUSADA", "EM_EXECUCAO", "AGUARDANDO_PECAS", "CONCLUIDA", "CANCELADA", "PLANEJADA", "AGUARDANDO_SUPRIMENTOS", "CONTRATADA"], {
     required_error: "O status é obrigatório.",
   }),
 });
 
-// Remove a interface EditServiceOrderPageProps pois usaremos useParams()
-// interface EditServiceOrderPageProps {
-//   params: {
-//     id: string;
-//   };
-// }
-
+// --- Componente da Página ---
 export default function EditServiceOrderPage() {
   const router = useRouter();
-  const { data: session } = useSession();
-  const params = useParams(); // Obtenha os parâmetros da URL usando useParams()
-  const id = params.id as string; // Acesse o ID diretamente. O useParams() retorna um objeto síncrono.
+  const { data: session, status } = useSession();
+  const params = useParams();
+  const id = params.id as string;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,17 +58,57 @@ export default function EditServiceOrderPage() {
     },
   });
 
+  // ✅ CORREÇÃO: Função auxiliar para verificar permissão para EDIÇÃO (mais restrita)
+  const hasEditPermission = (userRole: UserRole | undefined, userSector: UserSector | undefined) => {
+    if (!userRole || !userSector) return false;
+    if (userRole === UserRole.ADMIN) return true;
+
+    const allowedEditRoles = [
+      UserRole.GESTOR,
+      UserRole.SUPERVISOR,
+      UserRole.COORDENADOR,
+      UserRole.COMPRADOR_SERVICO,
+      UserRole.COMPRADOR_MATERIAL,
+      UserRole.ASSISTENTE,
+      UserRole.AUXILIAR,
+      UserRole.ESTAGIARIO,
+    ];
+    const allowedEditSectors = [
+      UserSector.ADMINISTRACAO, // ✅ Incluindo ADMINISTRACAO
+      UserSector.MANUTENCAO,
+      UserSector.OPERACAO,
+      UserSector.SUPRIMENTOS,
+      UserSector.ALMOXARIFADO,
+      UserSector.TRIPULACAO,
+      UserSector.RH, // ✅ Incluindo RH
+      UserSector.TI,
+      UserSector.NAO_DEFINIDO, // ✅ Incluindo NAO_DEFINIDO
+    ];
+
+    return allowedEditRoles.includes(userRole) && allowedEditSectors.includes(userSector);
+  };
+
+
   useEffect(() => {
-    if (!id) {
-        // Se o ID ainda não estiver disponível (ex: durante a primeira renderização), não faça nada.
-        // Isso pode acontecer se a rota não tiver um ID ou se a hidratação ainda estiver pendente.
-        return;
-    }
+    if (!id) return;
 
     async function fetchServiceOrder() {
       setLoading(true);
       setError(null);
       try {
+        if (status === "loading") return;
+        if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br")) {
+            toast.error("Acesso negado. Por favor, faça login.");
+            router.push("/login");
+            return;
+        }
+        if (!hasEditPermission(session?.user?.role, session?.user?.sector)) {
+          toast.error("Você não tem permissão para editar esta Ordem de Serviço.");
+          router.push("/dashboard");
+          return;
+        }
+
+
         const response = await fetch(`/api/service-orders/${id}`);
         if (!response.ok) {
           const errorData = await response.json();
@@ -105,12 +134,12 @@ export default function EditServiceOrderPage() {
       }
     }
     fetchServiceOrder();
-  }, [id, form]);
+  }, [id, form, session, status, router]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (!session?.user?.id) {
-      toast.error("Você precisa estar logado para editar uma Ordem de Serviço.");
-      router.push("/login");
+    if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br") || !hasEditPermission(session?.user?.role, session?.user?.sector)) {
+      toast.error("Você não tem permissão para realizar esta ação.");
+      router.push("/dashboard");
       return;
     }
 
@@ -142,10 +171,29 @@ export default function EditServiceOrderPage() {
     }
   };
 
+  if (status === "loading") {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center bg-gray-100">
+        <p className="text-xl text-gray-700">Verificando autenticação...</p>
+      </div>
+    );
+  }
+
+  if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br") || !hasEditPermission(session?.user?.role, session?.user?.sector)) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+        <FrownIcon className="h-20 w-20 text-red-400 mb-4" />
+        <h2 className="text-2xl font-bold text-red-700 mb-2">Acesso Negado</h2>
+        <p className="text-gray-500 mb-6">Você não tem permissão para acessar esta página ou seu acesso é restrito.</p>
+        <Button onClick={() => router.push("/login")}>Ir para Login</Button>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-gray-100">
-        <p className="text-xl text-gray-700">Carregando Ordem de Serviço...</p>
+        <p className="text-xl text-gray-700">Carregando dados da Ordem de Serviço...</p>
       </div>
     );
   }
@@ -156,6 +204,19 @@ export default function EditServiceOrderPage() {
         <FrownIcon className="h-20 w-20 text-red-400 mb-4" />
         <h2 className="text-2xl font-bold text-red-700 mb-2">Erro ao Carregar OS</h2>
         <p className="text-gray-500 mb-6">{error}</p>
+        <Link href="/dashboard/service-orders">
+          <Button>Voltar para a lista de OS</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  if (!form.getValues("title")) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+        <FrownIcon className="h-20 w-20 text-gray-400 mb-4" />
+        <h2 className="text-2xl font-bold text-gray-700 mb-2">Ordem de Serviço Não Encontrada</h2>
+        <p className="text-gray-500 mb-6">A Ordem de Serviço com o ID "{id}" não existe ou foi removida.</p>
         <Link href="/dashboard/service-orders">
           <Button>Voltar para a lista de OS</Button>
         </Link>
@@ -227,36 +288,17 @@ export default function EditServiceOrderPage() {
                   <SelectValue placeholder="Selecione a prioridade" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="BAIXA">Baixa</SelectItem>
-                  <SelectItem value="MEDIA">Média</SelectItem>
-                  <SelectItem value="ALTA">Alta</SelectItem>
-                  <SelectItem value="URGENTE">Urgente</SelectItem>
+                  {Object.values(Priority).map((priorityValue) => (
+                    <SelectItem key={priorityValue} value={priorityValue}>
+                      {priorityValue.replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {form.formState.errors.priority && (
                 <p className="text-sm text-red-600 mt-1">{form.formState.errors.priority.message}</p>
               )}
             </div>
-
-            {/* Campo para Atribuir a (ainda sem busca de usuários reais) */}
-            {/* <div>
-              <Label htmlFor="assignedTo">Atribuído a (Opcional)</Label>
-              <Select
-                onValueChange={(value) => form.setValue("assignedToId", value === "" ? null : value)}
-                value={form.watch("assignedToId") || ""}
-              >
-                <SelectTrigger id="assignedTo">
-                  <SelectValue placeholder="Selecione um responsável" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Não Atribuído</SelectItem>
-                  {/* usuários reais viriam aqui *}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.assignedToId && (
-                <p className="text-sm text-red-600 mt-1">{form.formState.errors.assignedToId.message}</p>
-              )}
-            </div> */}
 
             <div>
               <Label htmlFor="dueDate">Data de Prazo (Opcional)</Label>
@@ -280,14 +322,11 @@ export default function EditServiceOrderPage() {
                   <SelectValue placeholder="Selecione o status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="PENDENTE">Pendente</SelectItem>
-                  <SelectItem value="EM_ANALISE">Em Análise</SelectItem>
-                  <SelectItem value="APROVADA">Aprovada</SelectItem>
-                  <SelectItem value="RECUSADA">Recusada</SelectItem>
-                  <SelectItem value="EM_EXECUCAO">Em Execução</SelectItem>
-                  <SelectItem value="AGUARDANDO_PECAS">Aguardando Peças</SelectItem>
-                  <SelectItem value="CONCLUIDA">Concluída</SelectItem>
-                  <SelectItem value="CANCELADA">Cancelada</SelectItem>
+                  {Object.values(OrderStatus).map((statusValue) => (
+                    <SelectItem key={statusValue} value={statusValue}>
+                      {statusValue.replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {form.formState.errors.status && (

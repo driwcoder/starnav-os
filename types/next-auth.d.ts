@@ -1,6 +1,6 @@
 // types/next-auth.d.ts
 import NextAuth, { DefaultSession } from "next-auth";
-import { UserRole } from "@prisma/client"; // Importa o enum UserRole do Prisma
+import { UserRole, UserSector } from "@prisma/client"; // ✅ Importe UserSector
 
 declare module "next-auth" {
   interface Session {
@@ -9,7 +9,8 @@ declare module "next-auth" {
       email: string;
       name?: string | null;
       image?: string | null;
-      role: UserRole; // ✅ Adicionamos o 'role' aqui
+      role: UserRole;
+      sector: UserSector; // ✅ Adicionamos o 'sector' aqui
     } & DefaultSession["user"];
   }
 
@@ -18,7 +19,8 @@ declare module "next-auth" {
     email: string;
     name?: string | null;
     image?: string | null;
-    role: UserRole; // ✅ Adicionamos o 'role' aqui
+    role: UserRole;
+    sector: UserSector; // ✅ Adicionamos o 'sector' aqui
   }
 }
 
@@ -26,6 +28,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string;
     email: string;
-    role: UserRole; // ✅ Adicionamos o 'role' aqui
+    role: UserRole;
+    sector: UserSector; // ✅ Adicionamos o 'sector' aqui
   }
 }

@@ -3,7 +3,7 @@ import { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { UserRole } from "@prisma/client"; // Importe UserRole
+import { UserRole, UserSector } from "@prisma/client"; // ✅ Importe UserSector
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -42,12 +42,13 @@ export const authOptions: AuthOptions = {
           return null;
         }
 
-        // ✅ Retorne o role do usuário aqui!
+        // ✅ Retorne o role e o sector do usuário aqui!
         return {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role, // Adiciona o role
+          role: user.role,
+          sector: user.sector, // ✅ Adiciona o sector
         };
       },
     }),
@@ -60,20 +61,20 @@ export const authOptions: AuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
-      // O usuário retornado de authorize é adicionado ao token JWT
       if (user) {
         token.id = user.id;
         token.email = user.email;
-        token.role = (user as any).role; // ✅ Adiciona o role ao token
+        token.role = (user as any).role;
+        token.sector = (user as any).sector; // ✅ Adiciona o sector ao token
       }
       return token;
     },
     async session({ session, token }) {
-      // O token JWT é adicionado à sessão do cliente
       if (token) {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
-        session.user.role = token.role as UserRole; // ✅ Adiciona o role à sessão
+        session.user.role = token.role as UserRole;
+        session.user.sector = token.sector as UserSector; // ✅ Adiciona o sector à sessão
       }
       return session;
     },
