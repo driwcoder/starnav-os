@@ -5,16 +5,15 @@ import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import * as z from "zod";
 import { OrderStatus } from "@prisma/client";
-// Nao precisamos de OrderStatus, Priority, UserRole aqui para GET por ID
 
 // Schema de validação para o ID (se necessário)
 const idSchema = z.string().uuid("ID inválido.");
 
 // Handler para Requisições GET por ID
-export async function GET(request: Request, { params }: { params: any }) { // params tipado como any
+export async function GET(request: Request, { params }: { params: any }) {
   try {
-    const actualParams = await params; // await params aqui
-    const id = actualParams.id as string; // Use actualParams
+    const actualParams = await params;
+    const id = actualParams.id as string;
 
     // 1. Proteção de Rota (Autenticação e Domínio)
     const session = await getServerSession(authOptions);
@@ -30,7 +29,7 @@ export async function GET(request: Request, { params }: { params: any }) { // pa
 
     // 2. Busca a Ordem de Serviço específica no Banco de Dados
     const serviceOrder = await prisma.serviceOrder.findUnique({
-      where: { id: validatedId.data }, // Usa o ID validado
+      where: { id: validatedId.data },
       include: {
         createdBy: {
           select: { name: true, email: true, role: true },
@@ -46,7 +45,7 @@ export async function GET(request: Request, { params }: { params: any }) { // pa
     }
 
     // 3. Resposta de Sucesso
-    return NextResponse.json(serviceOrder, { status: 200 }); // Retorna JSON da OS
+    return NextResponse.json(serviceOrder, { status: 200 });
   } catch (error) {
     console.error("Erro ao buscar Ordem de Serviço por ID:", error);
     return new NextResponse("Erro interno do servidor ao buscar Ordem de Serviço.", { status: 500 });
@@ -67,10 +66,10 @@ const updateServiceOrderSchema = z.object({
   completedAt: z.string().datetime().optional().nullable(),
 });
 
-export async function PUT(request: Request, { params }: { params: any }) { // params tipado como any
+export async function PUT(request: Request, { params }: { params: any }) {
   try {
-    const actualParams = await params; // await params aqui
-    const id = actualParams.id as string; // Use actualParams
+    const actualParams = await params;
+    const id = actualParams.id as string;
 
     const session = await getServerSession(authOptions);
 
@@ -105,7 +104,7 @@ export async function PUT(request: Request, { params }: { params: any }) { // pa
       data: {
         ...dataToUpdate,
         dueDate: dueDate ? new Date(dueDate) : null,
-        status: status as OrderStatus | undefined,
+        status: status as OrderStatus | undefined, // OrderStatus é usado aqui
         completedAt: actualCompletedAt,
       },
     });
@@ -114,5 +113,37 @@ export async function PUT(request: Request, { params }: { params: any }) { // pa
   } catch (error) {
     console.error("Erro ao atualizar Ordem de Serviço por ID:", error);
     return new NextResponse("Erro interno do servidor ao atualizar Ordem de Serviço.", { status: 500 });
+  }
+}
+
+
+// Handler para Requisições DELETE (Exclusão)
+export async function DELETE(request: Request, { params }: { params: any }) {
+  try {
+    const actualParams = await params;
+    const id = actualParams.id as string;
+
+    const session = await getServerSession(authOptions);
+
+    if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
+      return new NextResponse("Não autorizado. Acesso restrito a funcionários StarNav.", { status: 403 });
+    }
+
+    const validatedId = idSchema.safeParse(id);
+    if (!validatedId.success) {
+        return new NextResponse("ID da Ordem de Serviço inválido para exclusão.", { status: 400 });
+    }
+
+    await prisma.serviceOrder.delete({
+      where: { id: validatedId.data },
+    });
+
+    return new NextResponse("Ordem de Serviço excluída com sucesso.", { status: 200 });
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+        return new NextResponse("Ordem de Serviço não encontrada para exclusão.", { status: 404 });
+    }
+    console.error("Erro ao excluir Ordem de Serviço:", error);
+    return new NextResponse("Erro interno do servidor ao excluir Ordem de Serviço.", { status: 500 });
   }
 }

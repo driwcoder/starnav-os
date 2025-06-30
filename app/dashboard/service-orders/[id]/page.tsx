@@ -1,8 +1,9 @@
 // app/dashboard/service-orders/[id]/page.tsx
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation"; // Importe useParams AQUI
+import { useSession } from "next-auth/react";
 import {
   Card,
   CardContent,
@@ -13,44 +14,147 @@ import {
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
-import { FrownIcon } from "lucide-react";
+import { FrownIcon, Trash2Icon } from "lucide-react";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
-export default async function ServiceOrderDetailsPage(props: any) {
-  const params = await props.params;
-  const session = await getServerSession(authOptions);
+export default function ServiceOrderDetailsPage() { // REMOVA { params }: any AQUI
+  const router = useRouter();
+  const { data: session, status } = useSession();
+  const params = useParams(); // ✅ OBTENHA OS PARAMS COM useParams()
+  const id = params.id as string; // Acesse o ID diretamente, useParams() retorna um objeto síncrono.
 
-  if (
-    !session ||
-    !(session.user?.email as string)?.endsWith("@starnav.com.br")
-  ) {
-    redirect("/login");
+  const [serviceOrder, setServiceOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchServiceOrder = async (orderId: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (status === "loading") return;
+      if (
+        status === "unauthenticated" ||
+        !(session?.user?.email as string)?.endsWith("@starnav.com.br")
+      ) {
+        toast.error("Acesso negado. Por favor, faça login.");
+        router.push("/login");
+        return;
+      }
+
+      const response = await fetch(`/api/service-orders/${orderId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.message || "Erro ao carregar Ordem de Serviço."
+        );
+      }
+      const data = await response.json();
+      setServiceOrder(data);
+    } catch (err: any) {
+      setError(err.message || "Não foi possível carregar a Ordem de Serviço.");
+      toast.error("Erro ao carregar OS: " + (err.message || "Erro desconhecido."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (id && status !== "loading") {
+      fetchServiceOrder(id);
+    }
+  }, [id, status, session, router]);
+
+  const handleDelete = async () => {
+    if (
+      status === "unauthenticated" ||
+      !(session?.user?.email as string)?.endsWith("@starnav.com.br")
+    ) {
+      toast.error("Você não tem permissão para realizar esta ação.");
+      router.push("/login");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/service-orders/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        toast.error(errorData.message || "Erro ao excluir Ordem de Serviço.");
+        return;
+      }
+
+      toast.success("Ordem de Serviço excluída com sucesso!");
+      router.push("/dashboard/service-orders");
+    } catch (err) {
+      console.error("Erro ao excluir OS:", err);
+      toast.error("Erro de rede ao excluir Ordem de Serviço.");
+    }
+  };
+
+  if (status === "loading") {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center bg-gray-100">
+        <p className="text-xl text-gray-700">Verificando autenticação...</p>
+      </div>
+    );
   }
 
-  // O TypeScript ainda inferirá 'id' corretamente como string por causa do uso abaixo.
-  const { id } = params;
+  if (
+    status === "unauthenticated" ||
+    !(session?.user?.email as string)?.endsWith("@starnav.com.br")
+  ) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+        <FrownIcon className="h-20 w-20 text-red-400 mb-4" />
+        <h2 className="text-2xl font-bold text-red-700 mb-2">Acesso Negado</h2>
+        <p className="text-gray-500 mb-6">
+          Você precisa estar logado com uma conta StarNav para acessar esta página.
+        </p>
+        <Button onClick={() => router.push("/login")}>Ir para Login</Button>
+      </div>
+    );
+  }
 
-  const serviceOrder = await prisma.serviceOrder.findUnique({
-    where: { id: id },
-    include: {
-      createdBy: {
-        select: { name: true, email: true, role: true },
-      },
-      assignedTo: {
-        select: { name: true, email: true, role: true },
-      },
-    },
-  });
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center bg-gray-100">
+        <p className="text-xl text-gray-700">Carregando Ordem de Serviço...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+        <FrownIcon className="h-20 w-20 text-red-400 mb-4" />
+        <h2 className="text-2xl font-bold text-red-700 mb-2">Erro ao Carregar OS</h2>
+        <p className="text-gray-500 mb-6">{error}</p>
+        <Link href="/dashboard/service-orders">
+          <Button>Voltar para a lista de OS</Button>
+        </Link>
+      </div>
+    );
+  }
 
   if (!serviceOrder) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
         <FrownIcon className="h-20 w-20 text-gray-400 mb-4" />
-        <h2 className="text-2xl font-bold text-gray-700 mb-2">
-          Ordem de Serviço Não Encontrada
-        </h2>
-        <p className="text-gray-500 mb-6">
-          A Ordem de Serviço com o ID "{id}" não existe ou foi removida.
-        </p>
+        <h2 className="text-2xl font-bold text-gray-700 mb-2">Ordem de Serviço Não Encontrada</h2>
+        <p className="text-gray-500 mb-6">A Ordem de Serviço com o ID "{id}" não existe ou foi removida.</p>
         <Link href="/dashboard/service-orders">
           <Button>Voltar para a lista de OS</Button>
         </Link>
@@ -169,6 +273,28 @@ export default async function ServiceOrderDetailsPage(props: any) {
             <Link href={`/dashboard/service-orders/${serviceOrder.id}/edit`}>
               <Button>Editar OS</Button>
             </Link>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="flex items-center gap-2">
+                  <Trash2Icon className="h-4 w-4" /> Excluir OS
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação não pode ser desfeita. Isso excluirá permanentemente
+                    esta Ordem de Serviço do nosso banco de dados.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete}>
+                    Excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <Link href="/dashboard/service-orders">
               <Button variant="outline">Voltar para a Lista</Button>
             </Link>
