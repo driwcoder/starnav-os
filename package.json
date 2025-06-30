@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "turbo": "next dev --turbo",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -35,6 +36,8 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@typescript-eslint/eslint-plugin": "^8.35.0",
+    "@typescript-eslint/parser": "^8.35.0",
     "eslint": "^9",
     "eslint-config-next": "15.3.4",
     "prisma": "^6.10.1",
