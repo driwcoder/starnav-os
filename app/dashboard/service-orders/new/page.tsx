@@ -1,23 +1,22 @@
 // app/dashboard/service-orders/new/page.tsx
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next/navigation"; // Removido useState
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea"; // Adicionar Textarea
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Adicionar Select
-import { toast } from "sonner"; // Adicionar sonner para notificações
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 
-// Importações para React Hook Form e Zod
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import Link from "next/link";
+import { ArrowLeftIcon } from "lucide-react";
 
-// --- Definição do Schema de Validação com Zod ---
 const formSchema = z.object({
   title: z.string().min(3, "O título deve ter no mínimo 3 caracteres.").max(255),
   description: z.string().optional(),
@@ -26,17 +25,13 @@ const formSchema = z.object({
   priority: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"], {
     required_error: "A prioridade é obrigatória.",
   }),
-  // assignedToId é opcional na criação, pode ser atribuído depois
   assignedToId: z.string().uuid("ID do responsável inválido.").optional().nullable(),
-  dueDate: z.string().optional().nullable(), // Data como string para input
+  dueDate: z.string().optional().nullable(),
 });
 
-// --- Componente da Página ---
 export default function CreateServiceOrderPage() {
   const router = useRouter();
   const { data: session } = useSession();
-
-  // Configuração do React Hook Form com Zod Resolver
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -44,39 +39,11 @@ export default function CreateServiceOrderPage() {
       description: "",
       ship: "",
       location: "",
-      priority: "MEDIA", // Valor padrão para prioridade
+      priority: "MEDIA",
       assignedToId: null,
       dueDate: "",
     },
   });
-
-  // Estado para armazenar a lista de usuários para o Select (se houver responsáveis)
-  const [users, setUsers] = useState<{ id: string; name: string | null; email: string }[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(true);
-
-  // Carregar usuários para o campo "Atribuído a"
-  // TODO: Em um projeto real, esta busca deve ser otimizada (paginação, busca por nome)
-  // e protegida por um papel de usuário (apenas admins/gestores podem ver todos os usuários).
-  // Por enquanto, faremos uma busca simples para demonstrar.
-  // useEffect(() => {
-  //   async function fetchUsers() {
-  //     try {
-  //       const res = await fetch('/api/users'); // Você criará esta API no futuro
-  //       if (res.ok) {
-  //         const data = await res.json();
-  //         setUsers(data);
-  //       } else {
-  //         toast.error("Erro ao carregar usuários.");
-  //       }
-  //     } catch (error) {
-  //       toast.error("Erro de rede ao carregar usuários.");
-  //     } finally {
-  //       setLoadingUsers(false);
-  //     }
-  //   }
-  //   fetchUsers();
-  // }, []);
-
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!session?.user?.id) {
@@ -88,12 +55,11 @@ export default function CreateServiceOrderPage() {
     try {
       const payload = {
         ...values,
-        createdById: session.user.id, // O ID do criador vem da sessão
-        // Converte dueDate para ISO string se existir
+        createdById: session.user.id,
         dueDate: values.dueDate ? new Date(values.dueDate).toISOString() : null,
       };
 
-      const response = await fetch("/api/service-orders", { // API Route para criar OS
+      const response = await fetch("/api/service-orders", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -108,8 +74,8 @@ export default function CreateServiceOrderPage() {
       }
 
       toast.success("Ordem de Serviço criada com sucesso!");
-      router.push("/dashboard/service-orders"); // Redireciona para a lista
-      form.reset(); // Reseta o formulário
+      router.push("/dashboard/service-orders");
+      form.reset();
     } catch (error) {
       console.error("Erro ao criar OS:", error);
       toast.error("Erro de rede ao criar Ordem de Serviço.");
@@ -177,7 +143,7 @@ export default function CreateServiceOrderPage() {
               <Label htmlFor="priority">Prioridade</Label>
               <Select
                 onValueChange={(value) => form.setValue("priority", value as "BAIXA" | "MEDIA" | "ALTA" | "URGENTE")}
-                value={form.watch("priority")} // Observa o valor para manter o Select atualizado
+                value={form.watch("priority")}
               >
                 <SelectTrigger id="priority">
                   <SelectValue placeholder="Selecione a prioridade" />
@@ -194,36 +160,11 @@ export default function CreateServiceOrderPage() {
               )}
             </div>
 
-            {/* Campo para Atribuir a (opcional por enquanto, será preenchido com usuários reais) */}
-            {/* <div>
-              <Label htmlFor="assignedTo">Atribuído a (Opcional)</Label>
-              <Select
-                onValueChange={(value) => form.setValue("assignedToId", value === "" ? null : value)}
-                value={form.watch("assignedToId") || ""}
-                disabled={loadingUsers}
-              >
-                <SelectTrigger id="assignedTo">
-                  <SelectValue placeholder={loadingUsers ? "Carregando usuários..." : "Selecione um responsável"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Não Atribuído</SelectItem>
-                  {users.map(user => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name || user.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.assignedToId && (
-                <p className="text-sm text-red-600 mt-1">{form.formState.errors.assignedToId.message}</p>
-              )}
-            </div> */}
-
             <div>
               <Label htmlFor="dueDate">Data de Prazo (Opcional)</Label>
               <Input
                 id="dueDate"
-                type="date" // Input de data HTML5
+                type="date"
                 {...form.register("dueDate")}
               />
               {form.formState.errors.dueDate && (

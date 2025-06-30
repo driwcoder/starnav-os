@@ -4,10 +4,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import * as z from "zod";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { OrderStatus, Priority, UserRole } from "@prisma/client";
+import { OrderStatus, Priority } from "@prisma/client"; // Removido UserRole, pois não é usado aqui
 
-// Schema de Validação para a API de Criação (POST)
 const createServiceOrderSchema = z.object({
   title: z.string().min(3).max(255),
   description: z.string().optional().nullable(),
@@ -19,7 +17,6 @@ const createServiceOrderSchema = z.object({
   dueDate: z.string().datetime().optional().nullable(),
 });
 
-// Handler para Requisições POST (Criação)
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -64,9 +61,6 @@ export async function POST(request: Request) {
   }
 }
 
-// Handler para Requisições GET (Listagem de TODAS as OS)
-// O aviso do ESLint sobre '_request' será resolvido com esta estrutura
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -75,7 +69,35 @@ export async function GET(_request: Request) {
       return new NextResponse("Não autorizado. Acesso restrito a funcionários StarNav.", { status: 403 });
     }
 
+    const url = new URL(_request.url);
+    const query = url.searchParams.get('query') || '';
+    const statusFilter = url.searchParams.get('status') || '';
+    const priorityFilter = url.searchParams.get('priority') || '';
+
+    const whereClause: any = {};
+
+    if (query) {
+      whereClause.OR = [
+        { title: { contains: query, mode: "insensitive" } },
+        { ship: { contains: query, mode: "insensitive" } },
+        { description: { contains: query, mode: "insensitive" } },
+      ];
+    }
+
+    if (statusFilter && statusFilter !== "TODOS") {
+      if (Object.values(OrderStatus).includes(statusFilter as OrderStatus)) {
+        whereClause.status = statusFilter;
+      }
+    }
+
+    if (priorityFilter && priorityFilter !== "TODAS") {
+      if (Object.values(Priority).includes(priorityFilter as Priority)) {
+        whereClause.priority = priorityFilter;
+      }
+    }
+
     const serviceOrders = await prisma.serviceOrder.findMany({
+      where: whereClause,
       orderBy: { requestedAt: "desc" },
       include: {
         createdBy: { select: { name: true, email: true } },

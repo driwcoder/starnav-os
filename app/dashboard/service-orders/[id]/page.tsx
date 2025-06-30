@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation"; // Importe useParams AQUI
+import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   Card,
@@ -28,48 +28,48 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-export default function ServiceOrderDetailsPage() { // REMOVA { params }: any AQUI
+export default function ServiceOrderDetailsPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const params = useParams(); // ✅ OBTENHA OS PARAMS COM useParams()
-  const id = params.id as string; // Acesse o ID diretamente, useParams() retorna um objeto síncrono.
+  const params = useParams();
+  const id = params.id as string;
 
   const [serviceOrder, setServiceOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchServiceOrder = async (orderId: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      if (status === "loading") return;
-      if (
-        status === "unauthenticated" ||
-        !(session?.user?.email as string)?.endsWith("@starnav.com.br")
-      ) {
-        toast.error("Acesso negado. Por favor, faça login.");
-        router.push("/login");
-        return;
-      }
-
-      const response = await fetch(`/api/service-orders/${orderId}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message || "Erro ao carregar Ordem de Serviço."
-        );
-      }
-      const data = await response.json();
-      setServiceOrder(data);
-    } catch (err: any) {
-      setError(err.message || "Não foi possível carregar a Ordem de Serviço.");
-      toast.error("Erro ao carregar OS: " + (err.message || "Erro desconhecido."));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchServiceOrder = async (orderId: string) => {
+      setLoading(true);
+      setError(null);
+      try {
+        if (status === "loading") return;
+        if (
+          status === "unauthenticated" ||
+          !(session?.user?.email as string)?.endsWith("@starnav.com.br")
+        ) {
+          toast.error("Acesso negado. Por favor, faça login.");
+          router.push("/login");
+          return;
+        }
+
+        const response = await fetch(`/api/service-orders/${orderId}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.message || "Erro ao carregar Ordem de Serviço."
+          );
+        }
+        const data = await response.json();
+        setServiceOrder(data);
+      } catch (err: any) {
+        setError(err.message || "Não foi possível carregar a Ordem de Serviço.");
+        toast.error("Erro ao carregar OS: " + (err.message || "Erro desconhecido."));
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (id && status !== "loading") {
       fetchServiceOrder(id);
     }

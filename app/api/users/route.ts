@@ -5,14 +5,14 @@ import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import * as z from "zod";
-import { UserRole } from "@prisma/client"; // Importe o enum UserRole
+import { UserRole } from "@prisma/client";
 
 // Schema de Validação para a API (Zod)
 const createUserSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   email: z.string().email().endsWith("@starnav.com.br", "O e-mail deve ser @starnav.com.br."),
   password: z.string().min(8),
-  role: z.nativeEnum(UserRole, { // Usar z.nativeEnum para enums TypeScript/Prisma
+  role: z.nativeEnum(UserRole, {
     required_error: "O papel do usuário é obrigatório.",
   }),
 });
@@ -22,7 +22,6 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    // 1. Proteção de Rota: Apenas ADMIN pode criar usuários
     if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
       return new NextResponse("Não autorizado. Acesso restrito a funcionários StarNav.", { status: 403 });
     }
@@ -36,7 +35,6 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    // 2. Validação dos dados de entrada com Zod
     const validatedData = createUserSchema.safeParse(body);
 
     if (!validatedData.success) {
@@ -46,7 +44,10 @@ export async function POST(request: Request) {
 
     const { name, email, password, role } = validatedData.data;
 
-    // 3. Verifica se o usuário já existe
+    if (email === process.env.ROOT_ADMIN_EMAIL) { // Protege o admin root de ser criado via API
+      return new NextResponse("Não é possível criar o usuário ROOT_ADMIN_EMAIL via API.", { status: 403 });
+    }
+
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -55,26 +56,23 @@ export async function POST(request: Request) {
       return new NextResponse("Usuário com este email já existe.", { status: 409 });
     }
 
-    // 4. Criptografa a senha antes de salvar
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 5. Criação do Usuário no Banco de Dados
     const newUser = await prisma.user.create({
       data: {
         name,
         email,
         password: hashedPassword,
-        role, // Salva o papel selecionado
+        role,
       },
     });
 
-    // 6. Resposta de Sucesso (sem a senha)
     return NextResponse.json({
       id: newUser.id,
       name: newUser.name,
       email: newUser.email,
       role: newUser.role,
-    }, { status: 201 }); // 201 Created
+    }, { status: 201 });
   } catch (error) {
     console.error("Erro ao criar usuário:", error);
     return new NextResponse("Erro interno do servidor ao criar usuário.", { status: 500 });
@@ -82,7 +80,6 @@ export async function POST(request: Request) {
 }
 
 // Handler para Requisições GET (Lista todos os usuários - para a página de listagem)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_request: Request) {
   try {
     const session = await getServerSession(authOptions);

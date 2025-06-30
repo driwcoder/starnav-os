@@ -1,8 +1,7 @@
 // app/dashboard/users/new/page.tsx
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next/navigation"; // Removido useState que não era usado
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,26 +14,31 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
-import { ArrowLeftIcon } from "lucide-react"; // Para o botão de voltar
-import { UserRole } from "@prisma/client"; // Importe o enum UserRole do Prisma
+import { ArrowLeftIcon, FrownIcon } from "lucide-react";
+import { UserRole } from "@prisma/client";
 
-// --- Definição do Schema de Validação com Zod ---
 const formSchema = z.object({
   name: z.string().min(2, "O nome deve ter no mínimo 2 caracteres.").max(100).optional(),
   email: z.string().email("Formato de e-mail inválido.").endsWith("@starnav.com.br", "O e-mail deve ser @starnav.com.br."),
   password: z.string().min(8, "A senha deve ter no mínimo 8 caracteres."),
-  role: z.nativeEnum(UserRole, { // Usar z.nativeEnum para enums TypeScript/Prisma
+  role: z.nativeEnum(UserRole, {
     required_error: "O papel do usuário é obrigatório.",
   }),
 });
 
-// --- Componente da Página ---
 export default function CreateUserPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      role: UserRole.COMUM,
+    },
+  });
 
-  // Verificar se o usuário logado é ADMIN no CLIENTE
-  // Esta é uma camada extra de UX/segurança visual. A validação real é no backend.
   if (status === "loading") {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-gray-100">
@@ -43,31 +47,32 @@ export default function CreateUserPage() {
     );
   }
 
-  if (session?.user?.email && !(session.user.email as string)?.endsWith("@starnav.com.br") || session?.user?.role !== UserRole.ADMIN) {
-    toast.error("Acesso negado. Apenas administradores podem criar usuários.");
+  if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br") || (session?.user?.role !== UserRole.ADMIN)) {
     router.push("/dashboard");
-    return null; // Retorna null para não renderizar o formulário
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+        <FrownIcon className="h-20 w-20 text-red-400 mb-4" />
+        <h2 className="text-2xl font-bold text-red-700 mb-2">Acesso Negado</h2>
+        <p className="text-gray-500 mb-6">Você não tem permissão para acessar esta página.</p>
+        <Button onClick={() => router.push("/login")}>Ir para Login</Button>
+      </div>
+    );
   }
 
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-      role: UserRole.COMUM, // Papel padrão para novos usuários
-    },
-  });
-
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+      toast.error("Você não tem permissão para realizar esta ação.");
+      router.push("/dashboard");
+      return;
+    }
+
     try {
-      const response = await fetch("/api/users", { // API Route para criar usuário
+      const response = await fetch("/api/users", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(values), // Envia todos os valores do formulário
+        body: JSON.stringify(values),
       });
 
       if (!response.ok) {
@@ -77,8 +82,8 @@ export default function CreateUserPage() {
       }
 
       toast.success("Usuário criado com sucesso!");
-      router.push("/dashboard/users"); // Redireciona para a lista de usuários
-      form.reset(); // Reseta o formulário
+      router.push("/dashboard/users");
+      form.reset();
     } catch (error) {
       console.error("Erro ao criar usuário:", error);
       toast.error("Erro de rede ao criar usuário.");
