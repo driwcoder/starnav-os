@@ -14,8 +14,6 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import Link from "next/link";
-import { ArrowLeftIcon } from "lucide-react";
 
 const formSchema = z.object({
   title: z.string().min(3, "O título deve ter no mínimo 3 caracteres.").max(255),

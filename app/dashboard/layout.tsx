@@ -1,6 +1,8 @@
 // app/dashboard/layout.tsx
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
+import { Suspense } from "react"; // ✅ Importe Suspense
+import Loading from "./loading";
 
 export default function DashboardLayout({
   children,
@@ -13,7 +15,10 @@ export default function DashboardLayout({
       <div className="flex flex-1">
         <Sidebar />
         <main className="flex-1 p-8">
-          {children}
+          {/* ✅ Envolve children com Suspense. O fallback será o componente Loading */}
+          <Suspense fallback={<Loading />}>
+            {children}
+          </Suspense>
         </main>
       </div>
     </div>

@@ -1,8 +1,9 @@
 // app/dashboard/users/page.tsx
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+"use client"; // Esta página é um Client Component
+
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation"; // Importe useSearchParams AQUI
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { UserRole } from "@prisma/client";
@@ -23,67 +24,154 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SearchIcon, XIcon } from "lucide-react";
+import { SearchIcon, XIcon, Trash2Icon, FrownIcon } from "lucide-react";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
-// Usamos 'any' aqui para contornar o bug de inferência do compilador do Next.js
-interface UsersPageProps {
-  searchParams: any; // Mantenha como 'any' para evitar erros de tipagem persistentes
-}
+export default function UsersPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams(); // ✅ OBTENHA OS PARAMS COM useSearchParams()
+  const { data: session, status } = useSession();
 
-export default async function UsersPage({ searchParams }: UsersPageProps) {
-  const session = await getServerSession(authOptions);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Proteção de rota: Apenas ADMIN pode acessar esta página
-  if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
-    redirect("/login");
-  }
-  const currentUser = await prisma.user.findUnique({
-    where: { email: session.user.email as string },
-    select: { role: true },
-  });
+  // Obtém os parâmetros da URL de forma síncrona
+  const query = searchParams.get("query") || "";
+  const roleFilter = searchParams.get("role") || "";
 
-  if (currentUser?.role !== UserRole.ADMIN) {
-    redirect("/dashboard");
-  }
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    setError(null);
+    try {
+      if (status === "loading") return;
+      if (
+        status === "unauthenticated" ||
+        !(session?.user?.email as string)?.endsWith("@starnav.com.br") ||
+        session?.user?.role !== UserRole.ADMIN
+      ) {
+        router.push("/dashboard");
+        toast.error("Acesso negado. Apenas administradores podem gerenciar usuários.");
+        return;
+      }
 
-  // ✅ CORREÇÃO: Await searchParams antes de acessar suas propriedades
-  const actualSearchParams = await searchParams;
+      const url = new URL("/api/users", window.location.origin);
+      if (query) url.searchParams.set("query", query);
+      if (roleFilter) url.searchParams.set("role", roleFilter);
 
-  // Obtém os parâmetros da URL
-  const query = actualSearchParams?.query || "";
-  const roleFilter = actualSearchParams?.role || "";
-
-  // Constrói o objeto 'where' para o Prisma
-  const whereClause: any = {};
-
-  if (query) {
-    whereClause.OR = [
-      { name: { contains: query, mode: "insensitive" } },
-      { email: { contains: query, mode: "insensitive" } },
-    ];
-  }
-
-  // Validar e tipar o valor do filtro para o enum UserRole
-  if (roleFilter && roleFilter !== "TODOS") {
-    if (Object.values(UserRole).includes(roleFilter as UserRole)) {
-      whereClause.role = roleFilter;
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Erro ao carregar usuários.");
+      }
+      const data = await response.json();
+      setUsers(data);
+    } catch (err: any) {
+      setError(err.message || "Não foi possível carregar os usuários.");
+      toast.error("Erro ao carregar usuários: " + (err.message || "Erro desconhecido."));
+    } finally {
+      setLoadingUsers(false);
     }
+  };
+
+  useEffect(() => {
+    if (status !== "loading") {
+      fetchUsers();
+    }
+  }, [query, roleFilter, status, session, router]);
+
+  const handleDelete = async (userId: string, userName: string | null) => {
+    if (
+      status === "unauthenticated" ||
+      !(session?.user?.email as string)?.endsWith("@starnav.com.br") ||
+      session?.user?.role !== UserRole.ADMIN
+    ) {
+      toast.error("Você não tem permissão para realizar esta ação.");
+      router.push("/dashboard");
+      return;
+    }
+
+    if (session?.user?.id === userId) {
+      toast.error("Você não pode excluir sua própria conta de administrador.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        toast.error(
+          errorData.message ||
+            `Erro ao excluir usuário ${userName || userId.substring(0, 6)}. Tente novamente.`
+        );
+        return;
+      }
+
+      toast.success(`Usuário ${userName || userId.substring(0, 6)} excluído com sucesso!`);
+      fetchUsers();
+    } catch (err) {
+      console.error("Erro ao excluir usuário:", err);
+      toast.error("Erro de rede ao excluir usuário.");
+    }
+  };
+
+  if (status === "loading") {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center bg-gray-100">
+        <p className="text-xl text-gray-700">Verificando autenticação...</p>
+      </div>
+    );
   }
 
-  const users = await prisma.user.findMany({
-    where: whereClause,
-    orderBy: {
-      createdAt: "asc",
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  if (
+    status === "unauthenticated" ||
+    !(session?.user?.email as string)?.endsWith("@starnav.com.br") ||
+    session?.user?.role !== UserRole.ADMIN
+  ) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+        <FrownIcon className="h-20 w-20 text-red-400 mb-4" />
+        <h2 className="text-2xl font-bold text-red-700 mb-2">Acesso Negado</h2>
+        <p className="text-gray-500 mb-6">
+          Você não tem permissão para acessar esta página.
+        </p>
+        <Button onClick={() => router.push("/login")}>Ir para Login</Button>
+      </div>
+    );
+  }
+
+  if (loadingUsers) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center bg-gray-100">
+        <p className="text-xl text-gray-700">Carregando usuários...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+        <FrownIcon className="h-20 w-20 text-red-400 mb-4" />
+        <h2 className="text-2xl font-bold text-red-700 mb-2">Erro ao Carregar Usuários</h2>
+        <p className="text-gray-500 mb-6">{error}</p>
+        <Button onClick={() => router.push("/dashboard")}>Voltar para o Dashboard</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8">
@@ -156,10 +244,32 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
                   <TableCell>{user.email}</TableCell>
                   <TableCell><span className="font-semibold">{user.role.replace(/_/g, ' ')}</span></TableCell>
                   <TableCell>{formatDate(user.createdAt)}</TableCell>
-                  <TableCell className="text-right space-x-2">
+                  <TableCell className="text-right space-x-2 flex items-center justify-end"> {/* ✅ Flexbox para alinhar botões */}
                     <Link href={`/dashboard/users/${user.id}/edit`}>
                       <Button variant="outline" size="sm">Editar</Button>
                     </Link>
+                    {/* Botão de Excluir com Diálogo de Confirmação */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm" className="flex items-center gap-2">
+                          <Trash2Icon className="h-4 w-4" /> Excluir
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta ação não pode ser desfeita. Isso excluirá permanentemente o usuário "{user.name || user.email}" do sistema.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(user.id, user.name)}>
+                            Excluir
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </TableCell>
                 </TableRow>
               ))}
