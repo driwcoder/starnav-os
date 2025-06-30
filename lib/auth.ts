@@ -1,8 +1,9 @@
 // lib/auth.ts
 import { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import prisma from "@/lib/prisma"; // Importe a instância do Prisma Client
-import bcrypt from "bcryptjs"; // Importe o bcryptjs
+import prisma from "@/lib/prisma";
+import bcrypt from "bcryptjs";
+import { UserRole } from "@prisma/client"; // Importe UserRole
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -14,42 +15,39 @@ export const authOptions: AuthOptions = {
       },
       async authorize(credentials, _req) {
         if (!credentials?.email || !credentials.password) {
-          return null; // Credenciais vazias
+          return null;
         }
 
-        // 1. Verificar o sufixo do e-mail
         if (!credentials.email.endsWith("@starnav.com.br")) {
           console.log("Tentativa de login com email não autorizado: ", credentials.email);
-          return null; // Não permite login se o sufixo não for o esperado
+          return null;
         }
 
-        // 2. Buscar o usuário no banco de dados pelo email
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         });
 
         if (!user) {
           console.log("Usuário não encontrado: ", credentials.email);
-          return null; // Usuário não encontrado
+          return null;
         }
 
-        // 3. Comparar a senha fornecida com o hash da senha no banco de dados
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
-          user.password // user.password é o hash armazenado no DB
+          user.password
         );
 
         if (!isPasswordValid) {
           console.log("Senha inválida para: ", credentials.email);
-          return null; // Senha incorreta
+          return null;
         }
 
-        // Se a autenticação for bem-sucedida, retorne um objeto de usuário simplificado
-        // Não retorne o hash da senha!
+        // ✅ Retorne o role do usuário aqui!
         return {
           id: user.id,
           name: user.name,
           email: user.email,
+          role: user.role, // Adiciona o role
         };
       },
     }),
@@ -62,16 +60,20 @@ export const authOptions: AuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
+      // O usuário retornado de authorize é adicionado ao token JWT
       if (user) {
         token.id = user.id;
         token.email = user.email;
+        token.role = (user as any).role; // ✅ Adiciona o role ao token
       }
       return token;
     },
     async session({ session, token }) {
+      // O token JWT é adicionado à sessão do cliente
       if (token) {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
+        session.user.role = token.role as UserRole; // ✅ Adiciona o role à sessão
       }
       return session;
     },
