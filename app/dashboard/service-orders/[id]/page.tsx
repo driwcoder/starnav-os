@@ -15,7 +15,8 @@ import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 import { FrownIcon } from "lucide-react";
 
-export default async function ServiceOrderDetailsPage({ params }: any) {
+export default async function ServiceOrderDetailsPage(props: any) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
 
   if (
