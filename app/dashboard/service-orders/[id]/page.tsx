@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
-import { FrownIcon, Trash2Icon } from "lucide-react";
+import { FrownIcon, Trash2Icon, PaperclipIcon } from "lucide-react"; // Adicionado PaperclipIcon
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -39,12 +39,10 @@ export default function ServiceOrderDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ CORREÇÃO: Função auxiliar para verificar permissão de VISUALIZAÇÃO
   const hasPermission = (userRole: UserRole | undefined, userSector: UserSector | undefined) => {
     if (!userRole || !userSector) return false;
     if (userRole === UserRole.ADMIN) return true;
 
-    // ✅ CORREÇÃO: Incluindo TODOS os novos cargos de comprador e tripulação
     const allowedRoles = [
       UserRole.GESTOR,
       UserRole.SUPERVISOR,
@@ -209,65 +207,35 @@ export default function ServiceOrderDetailsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Informações Principais */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h3 className="font-semibold text-lg text-gray-800 mb-2">
-                Informações Principais
+                Dados Gerais
               </h3>
-              <p className="text-gray-700">
-                <strong>Título:</strong> {serviceOrder.title}
+              <p className="text-gray-700"><strong>Título:</strong> {serviceOrder.title}</p>
+              <p className="text-gray-700"><strong>Status:</strong>{" "}
+                <span className={`font-semibold ${
+                    serviceOrder.status === "CONCLUIDA" ? "text-green-600" :
+                    serviceOrder.status === "PENDENTE" ? "text-yellow-600" :
+                    serviceOrder.status === "EM_EXECUCAO" ? "text-blue-600" :
+                    "text-gray-600"
+                  }`}>{serviceOrder.status.replace(/_/g, ' ')}</span>
               </p>
-              <p className="text-gray-700">
-                <strong>Status:</strong>{" "}
-                <span
-                  className={`font-semibold ${
-                    serviceOrder.status === "CONCLUIDA"
-                      ? "text-green-600"
-                      : serviceOrder.status === "PENDENTE"
-                      ? "text-yellow-600"
-                      : serviceOrder.status === "EM_EXECUCAO"
-                      ? "text-blue-600"
-                      : "text-gray-600"
-                  }`}
-                >
-                  {serviceOrder.status.replace(/_/g, " ")}
-                </span>
+              <p className="text-gray-700"><strong>Prioridade:</strong>{" "}
+                <span className={`font-semibold ${
+                    serviceOrder.priority === "URGENTE" ? "text-red-600" :
+                    serviceOrder.priority === "ALTA" ? "text-orange-600" :
+                    "text-gray-600"
+                  }`}>{serviceOrder.priority.replace(/_/g, ' ')}</span>
               </p>
-              <p className="text-gray-700">
-                <strong>Prioridade:</strong>{" "}
-                <span
-                  className={`font-semibold ${
-                    serviceOrder.priority === "URGENTE"
-                      ? "text-red-600"
-                      : serviceOrder.priority === "ALTA"
-                      ? "text-orange-600"
-                      : "text-gray-600"
-                  }`}
-                >
-                  {serviceOrder.priority.replace(/_/g, " ")}
-                </span>
-              </p>
-              <p className="text-gray-700">
-                <strong>Navio:</strong> {serviceOrder.ship}
-              </p>
-              <p className="text-gray-700">
-                <strong>Localização:</strong> {serviceOrder.location || "N/A"}
-              </p>
-              <p className="text-gray-700">
-                <strong>Data de Solicitação:</strong>{" "}
+              <p className="text-gray-700"><strong>Navio:</strong> {serviceOrder.ship}</p>
+              <p className="text-gray-700"><strong>Localização:</strong> {serviceOrder.location || "N/A"}</p>
+              <p className="text-gray-700"><strong>Data de Solicitação:</strong>{" "}
                 {formatDate(serviceOrder.requestedAt)}
               </p>
-              <p className="text-gray-700">
-                <strong>Prazo:</strong>{" "}
-                {serviceOrder.dueDate
-                  ? formatDate(serviceOrder.dueDate)
-                  : "Não definido"}
-              </p>
-              <p className="text-gray-700">
-                <strong>Data de Conclusão:</strong>{" "}
-                {serviceOrder.completedAt
-                  ? formatDate(serviceOrder.completedAt)
-                  : "Não concluída"}
+              <p className="text-gray-700"><strong>Prazo Final:</strong>{" "}
+                {serviceOrder.dueDate ? formatDate(serviceOrder.dueDate) : "Não definido"}
               </p>
             </div>
             <div>
@@ -280,7 +248,7 @@ export default function ServiceOrderDetailsPage() {
               </p>
               <p className="text-gray-700">
                 <strong>Papel do Criador:</strong>{" "}
-                {serviceOrder.createdBy?.role || "N/A"}
+                {serviceOrder.createdBy?.role?.replace(/_/g, ' ') || "N/A"}
               </p>
               <p className="text-gray-700">
                 <strong>Atribuído a:</strong>{" "}
@@ -290,20 +258,86 @@ export default function ServiceOrderDetailsPage() {
               </p>
               <p className="text-gray-700">
                 <strong>Papel do Responsável:</strong>{" "}
-                {serviceOrder.assignedTo?.role || "N/A"}
+                {serviceOrder.assignedTo?.role?.replace(/_/g, ' ') || "N/A"}
               </p>
             </div>
           </div>
 
+          {/* Descrição e Escopo de Serviço */}
           <div className="mt-6">
             <h3 className="font-semibold text-lg text-gray-800 mb-2">
-              Descrição Detalhada
+              Detalhes da OS
             </h3>
-            <p className="text-gray-700 whitespace-pre-wrap">
+            <p className="text-gray-700"><strong>Descrição:</strong>{" "}
               {serviceOrder.description || "Nenhuma descrição fornecida."}
+            </p>
+            <p className="text-gray-700"><strong>Escopo de Serviço:</strong>{" "}
+              {serviceOrder.scopeOfService || "Nenhum escopo definido."}
             </p>
           </div>
 
+          {/* Novos campos de Planejamento (Coordenador) */}
+          <div className="mt-6">
+            <h3 className="font-semibold text-lg text-gray-800 mb-2">
+              Planejamento de Atendimento
+            </h3>
+            <p className="text-gray-700"><strong>Início Programado:</strong>{" "}
+              {serviceOrder.plannedStartDate ? formatDate(serviceOrder.plannedStartDate) : "Não programado"}
+            </p>
+            <p className="text-gray-700"><strong>Término Estimado:</strong>{" "}
+              {serviceOrder.plannedEndDate ? formatDate(serviceOrder.plannedEndDate) : "Não programado"}
+            </p>
+            <p className="text-gray-700"><strong>Tipo de Solução:</strong>{" "}
+              {serviceOrder.solutionType ? serviceOrder.solutionType.replace(/_/g, ' ') : "Não definido"}
+            </p>
+            <p className="text-gray-700"><strong>Tripulação Responsável:</strong>{" "}
+              {serviceOrder.responsibleCrew || "Não atribuído"}
+            </p>
+            <p className="text-gray-700"><strong>Notas do Coordenador:</strong>{" "}
+              {serviceOrder.coordinatorNotes || "N/A"}
+            </p>
+          </div>
+
+          {/* Novos campos de Suprimentos (Comprador) */}
+          <div className="mt-6">
+            <h3 className="font-semibold text-lg text-gray-800 mb-2">
+              Informações de Suprimentos
+            </h3>
+            <p className="text-gray-700"><strong>Empresa Contratada:</strong>{" "}
+              {serviceOrder.contractedCompany || "N/A"}
+            </p>
+            <p className="text-gray-700"><strong>Data Contratação:</strong>{" "}
+              {serviceOrder.contractDate ? formatDate(serviceOrder.contractDate) : "N/A"}
+            </p>
+            <p className="text-gray-700"><strong>Custo do Serviço:</strong>{" "}
+              {serviceOrder.serviceOrderCost ? `R$ ${serviceOrder.serviceOrderCost.toFixed(2)}` : "N/A"}
+            </p>
+            <p className="text-gray-700"><strong>Notas do Suprimentos:</strong>{" "}
+              {serviceOrder.supplierNotes || "N/A"}
+            </p>
+          </div>
+
+          {/* Anexos de Relatório */}
+          <div className="mt-6">
+            <h3 className="font-semibold text-lg text-gray-800 mb-2 flex items-center gap-2">
+              <PaperclipIcon className="h-5 w-5 text-gray-600" /> Relatórios Anexados
+            </h3>
+            {serviceOrder.reportAttachments && serviceOrder.reportAttachments.length > 0 ? (
+              <ul className="list-disc pl-5 space-y-1">
+                {serviceOrder.reportAttachments.map((url: string, index: number) => (
+                  <li key={index}>
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      Anexo de Relatório {index + 1}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-gray-700">Nenhum relatório anexado.</p>
+            )}
+          </div>
+
+          {/* Botões de Ação */}
           <div className="flex justify-end gap-2 mt-8">
             <Link href={`/dashboard/service-orders/${serviceOrder.id}/edit`}>
               <Button>Editar OS</Button>
