@@ -1,4 +1,4 @@
-// app/dashboard/users/new/page.tsx
+// app/dashboard/service-orders/new/page.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
@@ -14,85 +15,76 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
-import { ArrowLeftIcon, FrownIcon } from "lucide-react";
-import { UserRole, UserSector } from "@prisma/client";
+import { ArrowLeftIcon } from "lucide-react";
+import { Priority } from "@prisma/client";
 
 // --- Definição do Schema de Validação com Zod ---
 const formSchema = z.object({
-  name: z.string().min(2, "O nome deve ter no mínimo 2 caracteres.").max(100).optional(),
-  email: z.string().email("Formato de e-mail inválido.").endsWith("@starnav.com.br", "O e-mail deve ser @starnav.com.br."),
-  password: z.string().min(8, "A senha deve ter no mínimo 8 caracteres."),
-  role: z.nativeEnum(UserRole, {
-    required_error: "O papel do usuário é obrigatório.",
+  title: z.string().min(3, "O título deve ter no mínimo 3 caracteres.").max(255),
+  description: z.string().optional().nullable(),
+  scopeOfService: z.string().optional().nullable(), // ✅ NOVO CAMPO: Escopo de Serviço (opcional)
+  ship: z.string().min(1, "O navio é obrigatório."),
+  location: z.string().optional().nullable(),
+  priority: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"], {
+    required_error: "A prioridade é obrigatória.",
   }),
-  sector: z.nativeEnum(UserSector, {
-    required_error: "O setor do usuário é obrigatório.",
-  }),
+  assignedToId: z.string().uuid("ID do responsável inválido.").optional().nullable(),
+  dueDate: z.string().optional().nullable(),
 });
 
 // --- Componente da Página ---
-export default function CreateUserPage() {
+export default function CreateServiceOrderPage() {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-      role: UserRole.ASSISTENTE, // Valor padrão para novos usuários
-      sector: UserSector.NAO_DEFINIDO, // Valor padrão para o setor
+      title: "",
+      description: null,
+      scopeOfService: null, // ✅ Valor padrão para o novo campo
+      ship: "",
+      location: null,
+      priority: "MEDIA",
+      assignedToId: null,
+      dueDate: null,
     },
   });
 
-  if (status === "loading") {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-gray-100">
-        <p className="text-xl text-gray-700">Verificando permissões...</p>
-      </div>
-    );
-  }
-
-  if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br") || (session?.user?.role !== UserRole.ADMIN)) {
-    router.push("/dashboard");
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
-        <FrownIcon className="h-20 w-20 text-red-400 mb-4" />
-        <h2 className="text-2xl font-bold text-red-700 mb-2">Acesso Negado</h2>
-        <p className="text-gray-500 mb-6">Você não tem permissão para acessar esta página.</p>
-        <Button onClick={() => router.push("/login")}>Ir para Login</Button>
-      </div>
-    );
-  }
-
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
-      toast.error("Você não tem permissão para realizar esta ação.");
-      router.push("/dashboard");
+    if (!session?.user?.id) {
+      toast.error("Você precisa estar logado para criar uma Ordem de Serviço.");
+      router.push("/login");
       return;
     }
 
     try {
-      const response = await fetch("/api/users", {
+      const payload = {
+        ...values,
+        createdById: session.user.id,
+        dueDate: values.dueDate ? new Date(values.dueDate).toISOString() : null,
+      };
+
+      const response = await fetch("/api/service-orders", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        toast.error(errorData.message || "Erro ao criar usuário.");
+        toast.error(errorData.message || "Erro ao criar Ordem de Serviço.");
         return;
       }
 
-      toast.success("Usuário criado com sucesso!");
-      router.push("/dashboard/users");
+      toast.success("Ordem de Serviço criada com sucesso!");
+      router.push("/dashboard/service-orders");
       form.reset();
     } catch (error) {
-      console.error("Erro ao criar usuário:", error);
-      toast.error("Erro de rede ao criar usuário.");
+      console.error("Erro ao criar OS:", error);
+      toast.error("Erro de rede ao criar Ordem de Serviço.");
     }
   };
 
@@ -100,104 +92,110 @@ export default function CreateUserPage() {
     <div className="container mx-auto py-8">
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">Criar Novo Usuário</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Criar Nova Ordem de Serviço</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div>
-              <Label htmlFor="name">Nome (Opcional)</Label>
+              <Label htmlFor="title">Título da OS</Label>
               <Input
-                id="name"
-                {...form.register("name")}
-                placeholder="Nome completo do usuário"
+                id="title"
+                {...form.register("title")}
+                placeholder="Ex: Reparo do motor principal"
               />
-              {form.formState.errors.name && (
-                <p className="text-sm text-red-600 mt-1">{form.formState.errors.name.message}</p>
+              {form.formState.errors.title && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.title.message}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                {...form.register("email")}
-                placeholder="usuario@starnav.com.br"
-                required
+              <Label htmlFor="description">Descrição</Label>
+              <Textarea
+                id="description"
+                {...form.register("description")}
+                placeholder="Detalhes do problema ou serviço a ser realizado."
+                rows={4}
               />
-              {form.formState.errors.email && (
-                <p className="text-sm text-red-600 mt-1">{form.formState.errors.email.message}</p>
+              {form.formState.errors.description && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.description.message}</p>
+              )}
+            </div>
+
+            {/* ✅ NOVO CAMPO: Escopo de Serviço */}
+            <div>
+              <Label htmlFor="scopeOfService">Escopo de Serviço (Opcional)</Label>
+              <Textarea
+                id="scopeOfService"
+                {...form.register("scopeOfService")}
+                placeholder="Detalhe o escopo de trabalho, o que será feito ou inspecionado."
+                rows={3}
+              />
+              {form.formState.errors.scopeOfService && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.scopeOfService.message}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="password">Senha</Label>
+              <Label htmlFor="ship">Navio</Label>
               <Input
-                id="password"
-                type="password"
-                {...form.register("password")}
-                placeholder="Senha segura (mínimo 8 caracteres)"
-                required
+                id="ship"
+                {...form.register("ship")}
+                placeholder="Ex: StarNav Alpha"
               />
-              {form.formState.errors.password && (
-                <p className="text-sm text-red-600 mt-1">{form.formState.errors.password.message}</p>
+              {form.formState.errors.ship && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.ship.message}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="role">Papel do Usuário</Label>
+              <Label htmlFor="location">Localização (Opcional)</Label>
+              <Input
+                id="location"
+                {...form.register("location")}
+                placeholder="Ex: Casa de Máquinas, Ponte de Comando"
+              />
+              {form.formState.errors.location && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.location.message}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="priority">Prioridade</Label>
               <Select
-                onValueChange={(value) => form.setValue("role", value as UserRole)}
-                value={form.watch("role")}
+                onValueChange={(value) => form.setValue("priority", value as "BAIXA" | "MEDIA" | "ALTA" | "URGENTE")}
+                value={form.watch("priority")}
               >
-                <SelectTrigger id="role">
-                  <SelectValue placeholder="Selecione um papel" />
+                <SelectTrigger id="priority">
+                  <SelectValue placeholder="Selecione a prioridade" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.values(UserRole).map((roleValue) => (
-                    <SelectItem key={roleValue} value={roleValue}>
-                      {roleValue.replace(/_/g, ' ')}
+                  {Object.values(Priority).map((priorityValue) => (
+                    <SelectItem key={priorityValue} value={priorityValue}>
+                      {priorityValue.replace(/_/g, ' ')}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {form.formState.errors.role && (
-                <p className="text-sm text-red-600 mt-1">{form.formState.errors.role.message}</p>
+              {form.formState.errors.priority && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.priority.message}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="sector">Setor do Usuário</Label>
-              <Select
-                onValueChange={(value) => form.setValue("sector", value as UserSector)}
-                value={form.watch("sector")}
-              >
-                <SelectTrigger id="sector">
-                  <SelectValue placeholder="Selecione um setor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(UserSector).map((sectorValue) => (
-                    <SelectItem key={sectorValue} value={sectorValue}>
-                      {sectorValue.replace(/_/g, ' ')}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.sector && (
-                <p className="text-sm text-red-600 mt-1">{form.formState.errors.sector.message}</p>
+              <Label htmlFor="dueDate">Data de Prazo (Opcional)</Label>
+              <Input
+                id="dueDate"
+                type="date"
+                {...form.register("dueDate")}
+              />
+              {form.formState.errors.dueDate && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.dueDate.message}</p>
               )}
             </div>
 
-            <div className="flex gap-4">
-              <Button type="submit" className="flex-1" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? "Criando..." : "Criar Usuário"}
-              </Button>
-              <Link href="/dashboard/users">
-                <Button type="button" variant="outline" className="flex items-center gap-2">
-                    <ArrowLeftIcon className="h-4 w-4" /> Voltar
-                </Button>
-              </Link>
-            </div>
+            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? "Criando..." : "Criar Ordem de Serviço"}
+            </Button>
           </form>
         </CardContent>
       </Card>

@@ -30,9 +30,9 @@ enum UserRole {
   GESTOR
   SUPERVISOR
   COORDENADOR
-  COMPRADOR_JUNIOR // NOVO CARGO
-  COMPRADOR_PLENO // NOVO CARGO
-  COMPRADOR_SENIOR // NOVO CARGO
+  COMPRADOR_JUNIOR
+  COMPRADOR_PLENO
+  COMPRADOR_SENIOR
   COMANDANTE
   IMEDIATO
   OQN
@@ -57,34 +57,38 @@ enum UserSector {
   NAO_DEFINIDO
 }
 
-// Modelo para a Ordem de Serviço (OS) - Mantido inalterado
+// Modelo para a Ordem de Serviço (OS)
 model ServiceOrder {
   id                 String         @id @default(uuid())
   title              String
   description        String?
-  scopeOfService     String?
+  scopeOfService     String?        // NOVO CAMPO: Escopo de Serviço
   status             OrderStatus    @default(PENDENTE)
   priority           Priority       @default(MEDIA)
   ship               String
   location           String?
   requestedAt        DateTime       @default(now())
-  dueDate            DateTime?
+  dueDate            DateTime?      // Prazo final para conclusão da OS
 
-  plannedStartDate   DateTime?
-  plannedEndDate     DateTime?
-  solutionType       SolutionType?
-  responsibleCrew    String?
-  coordinatorNotes   String?
+  // Novos campos para Planejamento do Atendimento (definidos pelo Coordenador)
+  plannedStartDate   DateTime?      // Data/hora programada para início do atendimento
+  plannedEndDate     DateTime?      // Data/hora estimada para término do atendimento
+  solutionType       SolutionType?  // Tipo de solução: Interna ou Terceirizada
+  responsibleCrew    String?        // Nome/identificação da tripulação interna responsável (se INTERNA)
+  coordinatorNotes   String?        // Anotações do Coordenador
 
-  contractedCompany  String?
-  contractDate       DateTime?
-  serviceOrderCost   Float?
-  supplierNotes      String?
+  // Novos campos para Atendimento de Suprimentos (definidos pelo Comprador)
+  contractedCompany  String?        // Nome da empresa terceirizada contratada
+  contractDate       DateTime?      // Data da contratação pelo suprimentos
+  serviceOrderCost   Float?         // Custo do serviço/contrato
+  supplierNotes      String?        // Anotações do Setor de Suprimentos
 
-  reportAttachments  String[]       @default([])
+  // NOVO CAMPO: Para anexar relatórios (URL(s) de arquivos)
+  reportAttachments  String[]       @default([]) // Array de strings para URLs de arquivos
 
-  completedAt        DateTime?
+  completedAt        DateTime?      // Data e hora da conclusão (se houver)
 
+  // Relações com o modelo User
   createdBy          User           @relation("CreatedBy", fields: [createdById], references: [id])
   createdById        String
 
@@ -92,7 +96,7 @@ model ServiceOrder {
   assignedToId       String?
 }
 
-// Enums OrderStatus, Priority, SolutionType - Mantidos inalterados
+// Enum para os status da Ordem de Serviço
 enum OrderStatus {
   PENDENTE
   EM_ANALISE
@@ -107,6 +111,7 @@ enum OrderStatus {
   CANCELADA
 }
 
+// Enum para as prioridades da Ordem de Serviço
 enum Priority {
   BAIXA
   MEDIA
@@ -114,6 +119,7 @@ enum Priority {
   URGENTE
 }
 
+// NOVO ENUM: Tipo de Solução para a OS
 enum SolutionType {
   INTERNA
   TERCEIRIZADA

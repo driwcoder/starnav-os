@@ -4,11 +4,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import * as z from "zod";
-import { OrderStatus, Priority } from "@prisma/client"; // Removido UserRole, pois não é usado aqui
+import { OrderStatus, Priority } from "@prisma/client";
 
+// --- Schema de Validação para a API de Criação (POST) ---
 const createServiceOrderSchema = z.object({
   title: z.string().min(3).max(255),
   description: z.string().optional().nullable(),
+  scopeOfService: z.string().optional().nullable(), // ✅ NOVO CAMPO: Escopo de Serviço
   ship: z.string().min(1),
   location: z.string().optional().nullable(),
   priority: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"]),
@@ -17,6 +19,7 @@ const createServiceOrderSchema = z.object({
   dueDate: z.string().datetime().optional().nullable(),
 });
 
+// Handler para Requisições POST (Criação)
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -34,7 +37,7 @@ export async function POST(request: Request) {
       return new NextResponse("Dados inválidos: " + JSON.stringify(validatedData.error.errors), { status: 400 });
     }
 
-    const { title, description, ship, location, priority, createdById, assignedToId, dueDate } = validatedData.data;
+    const { title, description, scopeOfService, ship, location, priority, createdById, assignedToId, dueDate } = validatedData.data; // ✅ Desestruturar scopeOfService
 
     if (createdById !== session.user.id) {
       return new NextResponse("ID do criador não corresponde ao usuário logado.", { status: 403 });
@@ -44,6 +47,7 @@ export async function POST(request: Request) {
       data: {
         title,
         description,
+        scopeOfService, // ✅ Passar scopeOfService para o Prisma
         ship,
         location,
         priority,
@@ -61,6 +65,7 @@ export async function POST(request: Request) {
   }
 }
 
+// Handler para Requisições GET (Listagem de TODAS as OS)
 export async function GET(_request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -90,7 +95,7 @@ export async function GET(_request: Request) {
       }
     }
 
-    if (priorityFilter && priorityFilter !== "TODAS") {
+    if (priorityFilter && priorityFilter !== "TODOS") {
       if (Object.values(Priority).includes(priorityFilter as Priority)) {
         whereClause.priority = priorityFilter;
       }
