@@ -1,7 +1,7 @@
 // app/dashboard/service-orders/[id]/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Key } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
@@ -391,31 +391,42 @@ export default function ServiceOrderDetailsPage() {
           </div>
 
           {/* Anexos da Ordem de Serviço */}
-      <div className="mt-6">
-        <h3 className="font-semibold text-lg text-gray-800 mb-2 flex items-center gap-2">
-          <PaperclipIcon className="h-5 w-5 text-gray-600" /> Anexos
-        </h3>
-        {serviceOrder.attachments && serviceOrder.attachments.length > 0 ? (
-          <ul className="list-disc pl-5 space-y-1">
-            {serviceOrder.attachments.map(
-              (attachment: { url: string; name?: string }, index: number) => (
-                <li key={index}>
-                  <a
-                    href={attachment.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    {attachment.name || `Anexo ${index + 1}`}
-                  </a>
-                </li>
-              )
+          <div className="mt-6">
+            <h3 className="font-semibold text-lg text-gray-800 mb-2 flex items-center gap-2">
+              <PaperclipIcon className="h-5 w-5 text-gray-600" /> Anexos
+            </h3>
+            {serviceOrder.reportAttachments?.length > 0 ? (
+              <div className="mt-6">
+                <h3 className="font-semibold text-lg text-gray-800 mb-2">
+                  Relatórios Anexados
+                </h3>
+                <ul className="space-y-2">
+                  {serviceOrder.reportAttachments.map(
+                    (
+                      url: string | undefined,
+                      index: Key | null | undefined
+                    ) => (
+                      <li
+                        key={index}
+                        className="flex justify-between items-center bg-gray-100 px-3 py-2 rounded"
+                      >
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 underline break-all"
+                        >
+                          {url ? url.split("/").pop() : "Arquivo desconhecido"}
+                        </a>
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-gray-700">Nenhum anexo disponível.</p>
             )}
-          </ul>
-        ) : (
-          <p className="text-gray-700">Nenhum anexo disponível.</p>
-        )}
-      </div>
+          </div>
 
           {/* Botões de Ação */}
           <div className="flex justify-end gap-2 mt-8">
@@ -454,7 +465,6 @@ export default function ServiceOrderDetailsPage() {
           </div>
         </CardContent>
       </Card>
-      
     </div>
   );
 }

@@ -14,19 +14,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const blob = await put(filename, request.body, {
     access: 'public',
+    addRandomSuffix: true,
   });
-
-  // Here's the code for Pages API Routes:
-  // const blob = await put(filename, request, {
-  //   access: 'public',
-  // });
+  if (!blob) {
+    return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
+  }
 
   return NextResponse.json(blob);
 }
 
-// The next lines are required for Pages API Routes only
-// export const config = {
-//   api: {
-//     bodyParser: false,
-//   },
-// };
