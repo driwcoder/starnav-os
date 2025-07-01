@@ -25,23 +25,20 @@ export default function Header() {
               <SheetHeader>
                 <SheetTitle>Navegação</SheetTitle>
                 <SheetDescription>
-                  Menu principal do StarNav OS
+                  Menu principal do Starnav
                 </SheetDescription>
               </SheetHeader>
               <nav className="flex flex-col space-y-4 pt-6">
-                {/* Alterar <a> para <Link> */}
                 <Link href="/" className="text-lg font-medium text-gray-700 hover:text-indigo-600">
                   Dashboard
                 </Link>
-                {/* Alterar <a> para <Link> */}
                 <Link href="/dashboard/service-orders" className="text-lg font-medium text-gray-700 hover:text-indigo-600">
                   Ordens de Serviço
                 </Link>
-                {/* Adicione outros links de navegação aqui */}
               </nav>
             </SheetContent>
           </Sheet>
-          <h1 className="ml-4 text-2xl font-bold text-indigo-600">StarNav OS</h1>
+          <h1 className="ml-4 text-2xl font-bold text-black">Starnav</h1>
         </div>
         <nav className="flex items-center space-x-4">
           {session?.user ? (
