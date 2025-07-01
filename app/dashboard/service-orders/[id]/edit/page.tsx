@@ -16,12 +16,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { ArrowLeftIcon, FrownIcon } from "lucide-react";
-import { OrderStatus, Priority, UserRole, UserSector } from "@prisma/client";
+import { OrderStatus, Priority, UserRole, UserSector, SolutionType } from "@prisma/client";
 
 // --- Definição do Schema de Validação com Zod ---
 const formSchema = z.object({
   title: z.string().min(3, "O título deve ter no mínimo 3 caracteres.").max(255),
   description: z.string().optional().nullable(),
+  scopeOfService: z.string().optional().nullable(),
   ship: z.string().min(1, "O navio é obrigatório."),
   location: z.string().optional().nullable(),
   priority: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"], {
@@ -32,6 +33,15 @@ const formSchema = z.object({
   status: z.enum(["PENDENTE", "EM_ANALISE", "APROVADA", "RECUSADA", "EM_EXECUCAO", "AGUARDANDO_PECAS", "CONCLUIDA", "CANCELADA", "PLANEJADA", "AGUARDANDO_SUPRIMENTOS", "CONTRATADA"], {
     required_error: "O status é obrigatório.",
   }),
+  plannedStartDate: z.string().optional().nullable(),
+  plannedEndDate: z.string().optional().nullable(),
+  solutionType: z.nativeEnum(SolutionType).optional().nullable(),
+  responsibleCrew: z.string().optional().nullable(),
+  coordinatorNotes: z.string().optional().nullable(),
+  contractedCompany: z.string().optional().nullable(),
+  contractDate: z.string().optional().nullable(),
+  serviceOrderCost: z.number().min(0).optional().nullable(),
+  supplierNotes: z.string().optional().nullable(),
 });
 
 // --- Componente da Página ---
@@ -49,21 +59,29 @@ export default function EditServiceOrderPage() {
     defaultValues: {
       title: "",
       description: null,
+      scopeOfService: null,
       ship: "",
       location: null,
       priority: "MEDIA",
       assignedToId: null,
       dueDate: null,
       status: "PENDENTE",
+      plannedStartDate: null,
+      plannedEndDate: null,
+      solutionType: null,
+      responsibleCrew: null,
+      coordinatorNotes: null,
+      contractedCompany: null,
+      contractDate: null,
+      serviceOrderCost: null,
+      supplierNotes: null,
     },
   });
 
-  // ✅ CORREÇÃO: Função auxiliar para verificar permissão para EDIÇÃO
   const hasEditPermission = (userRole: UserRole | undefined, userSector: UserSector | undefined) => {
     if (!userRole || !userSector) return false;
     if (userRole === UserRole.ADMIN) return true;
 
-    // ✅ CORREÇÃO: Incluindo TODOS os novos cargos de comprador e tripulação
     const allowedEditRoles = [
       UserRole.GESTOR,
       UserRole.SUPERVISOR,
@@ -81,7 +99,6 @@ export default function EditServiceOrderPage() {
       UserRole.AUXILIAR,
       UserRole.ESTAGIARIO,
     ];
-    // ✅ CORREÇÃO: Incluindo TODOS os setores válidos para edição
     const allowedEditSectors = [
       UserSector.ADMINISTRACAO,
       UserSector.MANUTENCAO,
@@ -128,12 +145,22 @@ export default function EditServiceOrderPage() {
         form.reset({
           title: data.title,
           description: data.description,
+          scopeOfService: data.scopeOfService,
           ship: data.ship,
           location: data.location,
           priority: data.priority,
           assignedToId: data.assignedToId || null,
           dueDate: data.dueDate ? new Date(data.dueDate).toISOString().split('T')[0] : null,
           status: data.status,
+          plannedStartDate: data.plannedStartDate ? new Date(data.plannedStartDate).toISOString().split('T')[0] : null,
+          plannedEndDate: data.plannedEndDate ? new Date(data.plannedEndDate).toISOString().split('T')[0] : null,
+          solutionType: data.solutionType || null,
+          responsibleCrew: data.responsibleCrew || null,
+          coordinatorNotes: data.coordinatorNotes || null,
+          contractedCompany: data.contractedCompany || null,
+          contractDate: data.contractDate ? new Date(data.contractDate).toISOString().split('T')[0] : null,
+          serviceOrderCost: data.serviceOrderCost !== undefined && data.serviceOrderCost !== null ? parseFloat(data.serviceOrderCost) : null,
+          supplierNotes: data.supplierNotes || null,
         });
       } catch (err: any) {
         setError(err.message || "Não foi possível carregar a Ordem de Serviço.");
@@ -156,6 +183,10 @@ export default function EditServiceOrderPage() {
       const payload = {
         ...values,
         dueDate: values.dueDate ? new Date(values.dueDate).toISOString() : null,
+        plannedStartDate: values.plannedStartDate ? new Date(values.plannedStartDate).toISOString() : null,
+        plannedEndDate: values.plannedEndDate ? new Date(values.plannedEndDate).toISOString() : null,
+        contractDate: values.contractDate ? new Date(values.contractDate).toISOString() : null,
+        serviceOrderCost: values.serviceOrderCost !== undefined && values.serviceOrderCost !== null ? parseFloat(values.serviceOrderCost as any) : null,
       };
 
       const response = await fetch(`/api/service-orders/${id}`, {
@@ -235,13 +266,14 @@ export default function EditServiceOrderPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <Card className="max-w-2xl mx-auto">
+      <Card className="max-w-3xl mx-auto">
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-center">Editar Ordem de Serviço</CardTitle>
           <CardDescription className="text-center">ID: {id}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Campos Existentes */}
             <div>
               <Label htmlFor="title">Título da OS</Label>
               <Input
@@ -262,6 +294,19 @@ export default function EditServiceOrderPage() {
               />
               {form.formState.errors.description && (
                 <p className="text-sm text-red-600 mt-1">{form.formState.errors.description.message}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="scopeOfService">Escopo de Serviço (Opcional)</Label>
+              <Textarea
+                id="scopeOfService"
+                {...form.register("scopeOfService")}
+                placeholder="Detalhe o escopo de trabalho, o que será feito ou inspecionado."
+                rows={3}
+              />
+              {form.formState.errors.scopeOfService && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.scopeOfService.message}</p>
               )}
             </div>
 
@@ -290,13 +335,14 @@ export default function EditServiceOrderPage() {
             <div>
               <Label htmlFor="priority">Prioridade</Label>
               <Select
-                onValueChange={(value) => form.setValue("priority", value as any)}
-                value={form.watch("priority")}
+                onValueChange={(value) => form.setValue("priority", value as Priority)}
+                value={form.watch("priority") || "MEDIA"} // ✅ Adicionado || "" para lidar com null/undefined
               >
                 <SelectTrigger id="priority">
                   <SelectValue placeholder="Selecione a prioridade" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="Prioridade">Selecione uma prioridade</SelectItem> {/* ✅ Placeholder com valor vazio */}
                   {Object.values(Priority).map((priorityValue) => (
                     <SelectItem key={priorityValue} value={priorityValue}>
                       {priorityValue.replace(/_/g, ' ')}
@@ -310,7 +356,7 @@ export default function EditServiceOrderPage() {
             </div>
 
             <div>
-              <Label htmlFor="dueDate">Data de Prazo (Opcional)</Label>
+              <Label htmlFor="dueDate">Prazo Final (Opcional)</Label>
               <Input
                 id="dueDate"
                 type="date"
@@ -324,13 +370,14 @@ export default function EditServiceOrderPage() {
             <div>
               <Label htmlFor="status">Status</Label>
               <Select
-                onValueChange={(value) => form.setValue("status", value as any)}
-                value={form.watch("status")}
+                onValueChange={(value) => form.setValue("status", value as OrderStatus)}
+                value={form.watch("status") || "MEDIA"} // ✅ Adicionado || "" para lidar com null/undefined
               >
                 <SelectTrigger id="status">
                   <SelectValue placeholder="Selecione o status" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="Atualize o Status">Selecione um status</SelectItem> {/* ✅ Placeholder com valor vazio */}
                   {Object.values(OrderStatus).map((statusValue) => (
                     <SelectItem key={statusValue} value={statusValue}>
                       {statusValue.replace(/_/g, ' ')}
@@ -343,7 +390,135 @@ export default function EditServiceOrderPage() {
               )}
             </div>
 
-            <div className="flex gap-4">
+            <hr className="my-4" />
+
+            <h3 className="font-semibold text-lg text-gray-800 col-span-full">
+              Planejamento de Atendimento
+            </h3>
+            <div>
+              <Label htmlFor="plannedStartDate">Início Programado (Opcional)</Label>
+              <Input
+                id="plannedStartDate"
+                type="date"
+                {...form.register("plannedStartDate")}
+              />
+              {form.formState.errors.plannedStartDate && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.plannedStartDate.message}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="plannedEndDate">Término Estimado (Opcional)</Label>
+              <Input
+                id="plannedEndDate"
+                type="date"
+                {...form.register("plannedEndDate")}
+              />
+              {form.formState.errors.plannedEndDate && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.plannedEndDate.message}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="solutionType">Tipo de Solução</Label>
+              <Select
+                onValueChange={(value) => form.setValue("solutionType", value === "" ? null : value as SolutionType)}
+                value={form.watch("solutionType") || ""}
+              >
+                <SelectTrigger id="solutionType">
+                  <SelectValue placeholder="Selecione o tipo de solução" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Selecione...">Não Definido</SelectItem>
+                  {Object.values(SolutionType).map((typeValue) => (
+                    <SelectItem key={typeValue} value={typeValue}>
+                      {typeValue.replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.solutionType && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.solutionType.message}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="responsibleCrew">Tripulação Responsável (Opcional)</Label>
+              <Input
+                id="responsibleCrew"
+                {...form.register("responsibleCrew")}
+                placeholder="Ex: Equipe de Máquinas Bordo"
+              />
+              {form.formState.errors.responsibleCrew && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.responsibleCrew.message}</p>
+              )}
+            </div>
+            <div className="col-span-full">
+              <Label htmlFor="coordinatorNotes">Notas do Coordenador (Opcional)</Label>
+              <Textarea
+                id="coordinatorNotes"
+                {...form.register("coordinatorNotes")}
+                rows={3}
+                placeholder="Anotações importantes sobre o planejamento do atendimento."
+              />
+              {form.formState.errors.coordinatorNotes && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.coordinatorNotes.message}</p>
+              )}
+            </div>
+
+            <hr className="my-4 col-span-full" />
+
+            <h3 className="font-semibold text-lg text-gray-800 col-span-full">
+              Informações de Suprimentos
+            </h3>
+            <div>
+              <Label htmlFor="contractedCompany">Empresa Contratada (Opcional)</Label>
+              <Input
+                id="contractedCompany"
+                {...form.register("contractedCompany")}
+                placeholder="Ex: XYZ Eletrica Naval"
+              />
+              {form.formState.errors.contractedCompany && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.contractedCompany.message}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="contractDate">Data da Contratação (Opcional)</Label>
+              <Input
+                id="contractDate"
+                type="date"
+                {...form.register("contractDate")}
+              />
+              {form.formState.errors.contractDate && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.contractDate.message}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="serviceOrderCost">Custo do Serviço (R$)</Label>
+              <Input
+                id="serviceOrderCost"
+                type="number"
+                step="0.01"
+                {...form.register("serviceOrderCost", { valueAsNumber: true })}
+                placeholder="Ex: 3500.00"
+              />
+              {form.formState.errors.serviceOrderCost && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.serviceOrderCost.message}</p>
+              )}
+            </div>
+            <div className="col-span-full">
+              <Label htmlFor="supplierNotes">Notas do Suprimentos (Opcional)</Label>
+              <Textarea
+                id="supplierNotes"
+                {...form.register("supplierNotes")}
+                rows={3}
+                placeholder="Anotações do setor de suprimentos sobre a contratação."
+              />
+              {form.formState.errors.supplierNotes && (
+                <p className="text-sm text-red-600 mt-1">{form.formState.errors.supplierNotes.message}</p>
+              )}
+            </div>
+
+
+            {/* Botões de Ação */}
+            <div className="flex gap-4 col-span-full mt-6">
               <Button type="submit" className="flex-1" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? "Salvando..." : "Salvar Alterações"}
               </Button>

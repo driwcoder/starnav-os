@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import * as z from "zod";
-import { OrderStatus, Priority, UserRole, UserSector } from "@prisma/client";
+import { OrderStatus, Priority, UserRole, UserSector, SolutionType } from "@prisma/client"; // Importe SolutionType
 
 // Schema de validação para o ID (comum para GET e PUT)
 const idSchema = z.string().uuid("ID inválido.");
@@ -13,6 +13,7 @@ const idSchema = z.string().uuid("ID inválido.");
 const updateServiceOrderSchema = z.object({
   title: z.string().min(3).max(255).optional(),
   description: z.string().optional().nullable(),
+  scopeOfService: z.string().optional().nullable(), // NOVO CAMPO
   ship: z.string().min(1).optional(),
   location: z.string().optional().nullable(),
   priority: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"]).optional(),
@@ -20,6 +21,17 @@ const updateServiceOrderSchema = z.object({
   dueDate: z.string().datetime().optional().nullable(),
   status: z.enum(["PENDENTE", "EM_ANALISE", "APROVADA", "RECUSADA", "EM_EXECUCAO", "AGUARDANDO_PECAS", "CONCLUIDA", "CANCELADA", "PLANEJADA", "AGUARDANDO_SUPRIMENTOS", "CONTRATADA"]).optional(),
   completedAt: z.string().datetime().optional().nullable(),
+  // Novos campos de Planejamento
+  plannedStartDate: z.string().datetime().optional().nullable(),
+  plannedEndDate: z.string().datetime().optional().nullable(),
+  solutionType: z.nativeEnum(SolutionType).optional().nullable(),
+  responsibleCrew: z.string().optional().nullable(),
+  coordinatorNotes: z.string().optional().nullable(),
+  // Novos campos de Suprimentos
+  contractedCompany: z.string().optional().nullable(),
+  contractDate: z.string().datetime().optional().nullable(),
+  serviceOrderCost: z.number().optional().nullable(), // Zod vai inferir de 'number' para float
+  supplierNotes: z.string().optional().nullable(),
 });
 
 // Handler para Requisições GET por ID
@@ -29,7 +41,6 @@ export async function GET(request: Request, { params }: { params: any }) {
     const id = actualParams.id as string;
 
     const session = await getServerSession(authOptions);
-    // ✅ CORREÇÃO: Função auxiliar para verificar permissão para VISUALIZAÇÃO
     const hasViewPermission = (userRole: UserRole | undefined, userSector: UserSector | undefined) => {
       if (!userRole || !userSector) return false;
       if (userRole === UserRole.ADMIN) return true;
@@ -41,12 +52,12 @@ export async function GET(request: Request, { params }: { params: any }) {
         UserRole.COMPRADOR_JUNIOR,
         UserRole.COMPRADOR_PLENO,
         UserRole.COMPRADOR_SENIOR,
-        UserRole.COMANDANTE, // ✅ Incluído
-        UserRole.IMEDIATO,    // ✅ Incluído
-        UserRole.OQN,         // ✅ Incluído
-        UserRole.CHEFE_MAQUINAS, // ✅ Incluído
-        UserRole.SUB_CHEFE_MAQUINAS, // ✅ Incluído
-        UserRole.OQM,         // ✅ Incluído
+        UserRole.COMANDANTE,
+        UserRole.IMEDIATO,
+        UserRole.OQN,
+        UserRole.CHEFE_MAQUINAS,
+        UserRole.SUB_CHEFE_MAQUINAS,
+        UserRole.OQM,
         UserRole.ASSISTENTE,
         UserRole.AUXILIAR,
         UserRole.ESTAGIARIO,
@@ -106,12 +117,10 @@ export async function PUT(request: Request, { params }: { params: any }) {
 
     const session = await getServerSession(authOptions);
 
-    // ✅ CORREÇÃO: Função auxiliar para verificar permissão para EDIÇÃO
     const hasEditPermission = (userRole: UserRole | undefined, userSector: UserSector | undefined) => {
       if (!userRole || !userSector) return false;
       if (userRole === UserRole.ADMIN) return true;
 
-      // ✅ CORREÇÃO: Incluindo TODOS os novos cargos de comprador e tripulação
       const allowedEditRoles = [
         UserRole.GESTOR,
         UserRole.SUPERVISOR,
@@ -162,7 +171,14 @@ export async function PUT(request: Request, { params }: { params: any }) {
         return new NextResponse("Dados inválidos: " + JSON.stringify(validatedData.error.errors), { status: 400 });
     }
 
-    const { dueDate, status, completedAt, ...dataToUpdate } = validatedData.data;
+    const {
+      dueDate, status, completedAt, // Campos já existentes no update
+      // Novos campos de Planejamento
+      plannedStartDate, plannedEndDate, solutionType, responsibleCrew, coordinatorNotes,
+      // Novos campos de Suprimentos
+      contractedCompany, contractDate, serviceOrderCost, supplierNotes,
+      ...dataToUpdate // O resto dos campos
+    } = validatedData.data;
 
     let actualCompletedAt = completedAt ? new Date(completedAt) : null;
     if (status === "CONCLUIDA" && !actualCompletedAt) {
@@ -174,10 +190,21 @@ export async function PUT(request: Request, { params }: { params: any }) {
     const updatedServiceOrder = await prisma.serviceOrder.update({
       where: { id: validatedId.data },
       data: {
-        ...dataToUpdate,
+        ...dataToUpdate, // Inclui title, description, ship, location, priority
         dueDate: dueDate ? new Date(dueDate) : null,
         status: status ? (status as OrderStatus) : undefined,
         completedAt: actualCompletedAt,
+        // ✅ Passar novos campos de Planejamento para o Prisma
+        plannedStartDate: plannedStartDate ? new Date(plannedStartDate) : null,
+        plannedEndDate: plannedEndDate ? new Date(plannedEndDate) : null,
+        solutionType: solutionType ? (solutionType as SolutionType) : undefined,
+        responsibleCrew: responsibleCrew,
+        coordinatorNotes: coordinatorNotes,
+        // ✅ Passar novos campos de Suprimentos para o Prisma
+        contractedCompany: contractedCompany,
+        contractDate: contractDate ? new Date(contractDate) : null,
+        serviceOrderCost: serviceOrderCost,
+        supplierNotes: supplierNotes,
       },
     });
 
