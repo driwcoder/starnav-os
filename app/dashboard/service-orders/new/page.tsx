@@ -14,8 +14,6 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import Link from "next/link";
-import { ArrowLeftIcon } from "lucide-react";
 import { Priority } from "@prisma/client";
 
 // --- Definição do Schema de Validação com Zod ---

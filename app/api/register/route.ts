@@ -1,7 +1,5 @@
 // app/api/register/route.ts
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth"; // getServerSession (não usado diretamente no POST)
-import { authOptions } from "@/lib/auth"; // authOptions (não usado diretamente no POST)
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import * as z from "zod";

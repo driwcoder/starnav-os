@@ -5,7 +5,6 @@ import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import * as z from "zod";
-import { UserRole } from "@prisma/client";
 
 // Schema de validação para a alteração de senha pelo próprio usuário
 const changeMyPasswordSchema = z.object({

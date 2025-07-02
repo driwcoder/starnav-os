@@ -6,7 +6,6 @@ import prisma from "@/lib/prisma";
 import * as z from "zod";
 import {
   OrderStatus,
-  Priority,
   UserRole,
   UserSector,
   SolutionType,

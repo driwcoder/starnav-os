@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { UserRole, UserSector } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import {
   Table,
   TableBody,
@@ -24,7 +24,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SearchIcon, XIcon, Trash2Icon, FrownIcon, KeyRoundIcon } from "lucide-react";
+import {
+  SearchIcon,
+  XIcon,
+  Trash2Icon,
+  FrownIcon,
+  KeyRoundIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -44,7 +50,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter
+  DialogFooter,
 } from "@/components/ui/dialog";
 
 import { useForm } from "react-hook-form";
@@ -52,11 +58,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Label } from "@/components/ui/label";
 
-
 const resetPasswordSchema = z.object({
-  newPassword: z.string().min(8, "A nova senha deve ter no mínimo 8 caracteres."),
+  newPassword: z
+    .string()
+    .min(8, "A nova senha deve ter no mínimo 8 caracteres."),
 });
-
 
 export default function UsersPage() {
   const router = useRouter();
@@ -66,9 +72,10 @@ export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
-  const [selectedUserForPasswordReset, setSelectedUserForPasswordReset] = useState<{ id: string; name: string | null; email: string } | null>(null);
-
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] =
+    useState(false);
+  const [selectedUserForPasswordReset, setSelectedUserForPasswordReset] =
+    useState<{ id: string; name: string | null; email: string } | null>(null);
 
   const query = searchParams.get("query") || "";
   const roleFilter = searchParams.get("role") || "";
@@ -85,9 +92,15 @@ export default function UsersPage() {
     setError(null);
     try {
       if (status === "loading") return;
-      if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br") || (session?.user?.role !== UserRole.ADMIN)) {
+      if (
+        status === "unauthenticated" ||
+        !(session?.user?.email as string)?.endsWith("@starnav.com.br") ||
+        session?.user?.role !== UserRole.ADMIN
+      ) {
         router.push("/dashboard");
-        toast.error("Acesso negado. Apenas administradores podem gerenciar usuários.");
+        toast.error(
+          "Acesso negado. Apenas administradores podem gerenciar usuários."
+        );
         return;
       }
 
@@ -104,7 +117,9 @@ export default function UsersPage() {
       setUsers(data);
     } catch (err: any) {
       setError(err.message || "Não foi possível carregar os usuários.");
-      toast.error("Erro ao carregar usuários: " + (err.message || "Erro desconhecido."));
+      toast.error(
+        "Erro ao carregar usuários: " + (err.message || "Erro desconhecido.")
+      );
     } finally {
       setLoadingUsers(false);
     }
@@ -114,7 +129,7 @@ export default function UsersPage() {
     if (status !== "loading") {
       fetchUsers();
     }
-  }, [query, roleFilter, status, session, router]);
+  }, [query, roleFilter, status, session, router, fetchUsers]);
 
   const handleDelete = async (userId: string, userName: string | null) => {
     if (
@@ -141,12 +156,16 @@ export default function UsersPage() {
         const errorData = await response.json();
         toast.error(
           errorData.message ||
-            `Erro ao excluir usuário ${userName || userId.substring(0, 6)}. Tente novamente.`
+            `Erro ao excluir usuário ${
+              userName || userId.substring(0, 6)
+            }. Tente novamente.`
         );
         return;
       }
 
-      toast.success(`Usuário ${userName || userId.substring(0, 6)} excluído com sucesso!`);
+      toast.success(
+        `Usuário ${userName || userId.substring(0, 6)} excluído com sucesso!`
+      );
       fetchUsers();
     } catch (err) {
       console.error("Erro ao excluir usuário:", err);
@@ -154,17 +173,22 @@ export default function UsersPage() {
     }
   };
 
-  const handleResetPassword = async (values: z.infer<typeof resetPasswordSchema>) => {
+  const handleResetPassword = async (
+    values: z.infer<typeof resetPasswordSchema>
+  ) => {
     if (!selectedUserForPasswordReset) return;
 
     try {
-      const response = await fetch(`/api/users/${selectedUserForPasswordReset.id}/password`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      });
+      const response = await fetch(
+        `/api/users/${selectedUserForPasswordReset.id}/password`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(values),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -172,7 +196,12 @@ export default function UsersPage() {
         return;
       }
 
-      toast.success(`Senha de ${selectedUserForPasswordReset.name || selectedUserForPasswordReset.email} redefinida com sucesso!`);
+      toast.success(
+        `Senha de ${
+          selectedUserForPasswordReset.name ||
+          selectedUserForPasswordReset.email
+        } redefinida com sucesso!`
+      );
       setIsResetPasswordModalOpen(false);
       resetPasswordForm.reset();
     } catch (err) {
@@ -180,7 +209,6 @@ export default function UsersPage() {
       toast.error("Erro de rede ao redefinir senha.");
     }
   };
-
 
   if (status === "loading") {
     return (
@@ -219,9 +247,13 @@ export default function UsersPage() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
         <FrownIcon className="h-20 w-20 text-red-400 mb-4" />
-        <h2 className="text-2xl font-bold text-red-700 mb-2">Erro ao Carregar Usuários</h2>
+        <h2 className="text-2xl font-bold text-red-700 mb-2">
+          Erro ao Carregar Usuários
+        </h2>
         <p className="text-gray-500 mb-6">{error}</p>
-        <Button onClick={() => router.push("/dashboard")}>Voltar para o Dashboard</Button>
+        <Button onClick={() => router.push("/dashboard")}>
+          Voltar para o Dashboard
+        </Button>
       </div>
     );
   }
@@ -229,7 +261,9 @@ export default function UsersPage() {
   return (
     <div className="container mx-auto py-8">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-3xl font-bold text-gray-800">Gerenciamento de Usuários</h2>
+        <h2 className="text-3xl font-bold text-gray-800">
+          Gerenciamento de Usuários
+        </h2>
         <Link href="/dashboard/users/new">
           <Button>Criar Novo Usuário</Button>
         </Link>
@@ -247,7 +281,11 @@ export default function UsersPage() {
             />
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             {query && (
-              <Link href="/dashboard/users" passHref className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
+              <Link
+                href="/dashboard/users"
+                passHref
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              >
                 <XIcon className="h-5 w-5" />
               </Link>
             )}
@@ -263,19 +301,23 @@ export default function UsersPage() {
                   <SelectItem value="TODOS">Todos os Papéis</SelectItem>
                   {Object.values(UserRole).map((roleValue) => (
                     <SelectItem key={roleValue} value={roleValue}>
-                      {roleValue.replace(/_/g, ' ')}
+                      {roleValue.replace(/_/g, " ")}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" className="md:w-auto">Aplicar Filtros</Button>
+            <Button type="submit" className="md:w-auto">
+              Aplicar Filtros
+            </Button>
           </div>
         </form>
       </div>
 
       {users.length === 0 ? (
-        <p className="text-center text-gray-600">Nenhum usuário encontrado com os filtros aplicados.</p>
+        <p className="text-center text-gray-600">
+          Nenhum usuário encontrado com os filtros aplicados.
+        </p>
       ) : (
         <div className="rounded-md border">
           <Table>
@@ -293,21 +335,39 @@ export default function UsersPage() {
             <TableBody>
               {users.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.id.substring(0, 6)}...</TableCell>
+                  <TableCell className="font-medium">
+                    {user.id.substring(0, 6)}...
+                  </TableCell>
                   <TableCell>{user.name || "N/A"}</TableCell>
                   <TableCell>{user.email}</TableCell>
-                  <TableCell><span className="font-semibold">{user.role.replace(/_/g, ' ')}</span></TableCell>
-                  <TableCell><span className="font-semibold">{user.sector.replace(/_/g, ' ')}</span></TableCell>
+                  <TableCell>
+                    <span className="font-semibold">
+                      {user.role.replace(/_/g, " ")}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-semibold">
+                      {user.sector.replace(/_/g, " ")}
+                    </span>
+                  </TableCell>
                   <TableCell>{formatDate(user.createdAt)}</TableCell>
                   <TableCell className="text-right space-x-2 flex items-center justify-end">
                     <Link href={`/dashboard/users/${user.id}/edit`}>
-                      <Button variant="outline" size="sm">Editar</Button>
+                      <Button variant="outline" size="sm">
+                        Editar
+                      </Button>
                     </Link>
                     {/* Botão de Redefinir Senha */}
-                    <Dialog open={isResetPasswordModalOpen && selectedUserForPasswordReset?.id === user.id} onOpenChange={(open) => {
-                      setIsResetPasswordModalOpen(open);
-                      if (!open) resetPasswordForm.reset(); // Reseta o form ao fechar
-                    }}>
+                    <Dialog
+                      open={
+                        isResetPasswordModalOpen &&
+                        selectedUserForPasswordReset?.id === user.id
+                      }
+                      onOpenChange={(open) => {
+                        setIsResetPasswordModalOpen(open);
+                        if (!open) resetPasswordForm.reset(); // Reseta o form ao fechar
+                      }}
+                    >
                       <DialogTrigger asChild>
                         <Button
                           variant="outline"
@@ -323,12 +383,21 @@ export default function UsersPage() {
                       </DialogTrigger>
                       <DialogContent className="sm:max-w-[425px]">
                         <DialogHeader>
-                          <DialogTitle>Redefinir Senha para {selectedUserForPasswordReset?.name || selectedUserForPasswordReset?.email}</DialogTitle>
+                          <DialogTitle>
+                            Redefinir Senha para{" "}
+                            {selectedUserForPasswordReset?.name ||
+                              selectedUserForPasswordReset?.email}
+                          </DialogTitle>
                           <DialogDescription>
                             Digite a nova senha para este usuário.
                           </DialogDescription>
                         </DialogHeader>
-                        <form onSubmit={resetPasswordForm.handleSubmit(handleResetPassword)} className="grid gap-4 py-4">
+                        <form
+                          onSubmit={resetPasswordForm.handleSubmit(
+                            handleResetPassword
+                          )}
+                          className="grid gap-4 py-4"
+                        >
                           <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="newPassword" className="text-right">
                               Nova Senha
@@ -342,13 +411,29 @@ export default function UsersPage() {
                           </div>
                           {resetPasswordForm.formState.errors.newPassword && (
                             <p className="text-sm text-red-600 mt-1 col-span-4 text-right">
-                              {resetPasswordForm.formState.errors.newPassword.message}
+                              {
+                                resetPasswordForm.formState.errors.newPassword
+                                  .message
+                              }
                             </p>
                           )}
                           <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setIsResetPasswordModalOpen(false)}>Cancelar</Button>
-                            <Button type="submit" disabled={resetPasswordForm.formState.isSubmitting}>
-                              {resetPasswordForm.formState.isSubmitting ? "Redefinindo..." : "Redefinir"}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setIsResetPasswordModalOpen(false)}
+                            >
+                              Cancelar
+                            </Button>
+                            <Button
+                              type="submit"
+                              disabled={
+                                resetPasswordForm.formState.isSubmitting
+                              }
+                            >
+                              {resetPasswordForm.formState.isSubmitting
+                                ? "Redefinindo..."
+                                : "Redefinir"}
                             </Button>
                           </DialogFooter>
                         </form>
@@ -358,7 +443,11 @@ export default function UsersPage() {
                     {/* Botão de Excluir */}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm" className="flex items-center gap-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
                           <Trash2Icon className="h-4 w-4" /> Excluir
                         </Button>
                       </AlertDialogTrigger>
@@ -366,12 +455,16 @@ export default function UsersPage() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Esta ação não pode ser desfeita. Isso excluirá permanentemente o usuário "{user.name || user.email}" do sistema.
+                            Esta ação não pode ser desfeita. Isso excluirá
+                            permanentemente o usuário "{user.name || user.email}
+                            " do sistema.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(user.id, user.name)}>
+                          <AlertDialogAction
+                            onClick={() => handleDelete(user.id, user.name)}
+                          >
                             Excluir
                           </AlertDialogAction>
                         </AlertDialogFooter>

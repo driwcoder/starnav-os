@@ -1,7 +1,6 @@
 // app/register/page.tsx
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,8 +12,6 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import Link from "next/link";
-import { ArrowLeftIcon } from "lucide-react";
 import { UserRole, UserSector } from "@prisma/client";
 
 // --- Definição do Schema de Validação com Zod ---
