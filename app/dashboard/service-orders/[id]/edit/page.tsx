@@ -36,8 +36,8 @@ import {
   UserSector,
   SolutionType,
 } from "@prisma/client";
-import { put, PutBlobResult } from "@vercel/blob";
-import { NextResponse } from "next/server";
+import { ConfirmDeleteAttachment } from "@/components/confirm-delete-attachment";
+import { PutBlobResult } from "@vercel/blob";
 
 // --- Definição do Schema de Validação com Zod ---
 const formSchema = z.object({
@@ -97,6 +97,7 @@ export default function EditServiceOrderPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [serviceOrder, setServiceOrder] = useState<any>(null);
   const inputFileRef = useRef<HTMLInputElement>(null);
   const [blob, setBlob] = useState<any>(null);
 
@@ -167,85 +168,87 @@ export default function EditServiceOrderPage() {
     );
   };
 
+  // Função de permissão igual...
+
+  // 1. Buscar dados da OS apenas quando necessário
   useEffect(() => {
-    if (!id) return;
+    if (!id || status === "loading") return;
 
-    async function fetchServiceOrder() {
-      setLoading(true);
-      setError(null);
-      try {
-        if (status === "loading") return;
-        if (
-          status === "unauthenticated" ||
-          !(session?.user?.email as string)?.endsWith("@starnav.com.br")
-        ) {
-          toast.error("Acesso negado. Por favor, faça login.");
-          router.push("/login");
-          return;
-        }
-        if (!hasEditPermission(session?.user?.role, session?.user?.sector)) {
-          toast.error(
-            "Você não tem permissão para editar esta Ordem de Serviço."
-          );
-          router.push("/dashboard");
-          return;
-        }
+    if (
+      status === "unauthenticated" ||
+      !(session?.user?.email as string)?.endsWith("@starnav.com.br")
+    ) {
+      toast.error("Acesso negado. Por favor, faça login.");
+      router.push("/login");
+      return;
+    }
+    if (!hasEditPermission(session?.user?.role, session?.user?.sector)) {
+      toast.error("Você não tem permissão para editar esta Ordem de Serviço.");
+      router.push("/dashboard");
+      return;
+    }
 
-        const response = await fetch(`/api/service-orders/${id}`);
+    setLoading(true);
+    setError(null);
+
+    fetch(`/api/service-orders/${id}`)
+      .then(async (response) => {
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(
-            errorData.message || "Erro ao carregar Ordem de Serviço."
-          );
+          throw new Error(errorData.message || "Erro ao carregar Ordem de Serviço.");
         }
-        const data = await response.json();
+        return response.json();
+      })
+      .then((data) => {
+        setServiceOrder(data);
+        setError(null);
+      })
+      .catch((err: any) => {
+        setError(err.message || "Não foi possível carregar a Ordem de Serviço.");
+        toast.error("Erro ao carregar OS: " + (err.message || "Erro desconhecido."));
+      })
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, status, session?.user?.email, session?.user?.role, session?.user?.sector, router]);
 
-        form.reset({
-          title: data.title,
-          description: data.description,
-          scopeOfService: data.scopeOfService,
-          ship: data.ship,
-          location: data.location,
-          priority: data.priority,
-          assignedToId: data.assignedToId || null,
-          dueDate: data.dueDate
-            ? new Date(data.dueDate).toISOString().split("T")[0]
-            : null,
-          status: data.status,
-          plannedStartDate: data.plannedStartDate
-            ? new Date(data.plannedStartDate).toISOString().split("T")[0]
-            : null,
-          plannedEndDate: data.plannedEndDate
-            ? new Date(data.plannedEndDate).toISOString().split("T")[0]
-            : null,
-          solutionType: data.solutionType || null,
-          responsibleCrew: data.responsibleCrew || null,
-          coordinatorNotes: data.coordinatorNotes || null,
-          contractedCompany: data.contractedCompany || null,
-          contractDate: data.contractDate
-            ? new Date(data.contractDate).toISOString().split("T")[0]
-            : null,
-          serviceOrderCost:
-            data.serviceOrderCost !== undefined &&
-            data.serviceOrderCost !== null
-              ? parseFloat(data.serviceOrderCost)
-              : null,
-          supplierNotes: data.supplierNotes || null,
-          reportAttachments: data.reportAttachments || [],
-        });
-      } catch (err: any) {
-        setError(
-          err.message || "Não foi possível carregar a Ordem de Serviço."
-        );
-        toast.error(
-          "Erro ao carregar OS: " + (err.message || "Erro desconhecido.")
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchServiceOrder();
-  }, [id, form, session, status, router]);
+  // 2. Resetar o formulário apenas quando serviceOrder mudar
+  useEffect(() => {
+    if (!serviceOrder) return;
+    form.reset({
+      title: serviceOrder.title,
+      description: serviceOrder.description,
+      scopeOfService: serviceOrder.scopeOfService,
+      ship: serviceOrder.ship,
+      location: serviceOrder.location,
+      priority: serviceOrder.priority,
+      assignedToId: serviceOrder.assignedToId || null,
+      dueDate: serviceOrder.dueDate
+        ? new Date(serviceOrder.dueDate).toISOString().split("T")[0]
+        : null,
+      status: serviceOrder.status,
+      plannedStartDate: serviceOrder.plannedStartDate
+        ? new Date(serviceOrder.plannedStartDate).toISOString().split("T")[0]
+        : null,
+      plannedEndDate: serviceOrder.plannedEndDate
+        ? new Date(serviceOrder.plannedEndDate).toISOString().split("T")[0]
+        : null,
+      solutionType: serviceOrder.solutionType || null,
+      responsibleCrew: serviceOrder.responsibleCrew || null,
+      coordinatorNotes: serviceOrder.coordinatorNotes || null,
+      contractedCompany: serviceOrder.contractedCompany || null,
+      contractDate: serviceOrder.contractDate
+        ? new Date(serviceOrder.contractDate).toISOString().split("T")[0]
+        : null,
+      serviceOrderCost:
+        serviceOrder.serviceOrderCost !== undefined &&
+        serviceOrder.serviceOrderCost !== null
+          ? parseFloat(serviceOrder.serviceOrderCost)
+          : null,
+      supplierNotes: serviceOrder.supplierNotes || null,
+      reportAttachments: serviceOrder.reportAttachments || [],
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serviceOrder]);
 
   const onSubmit: SubmitHandler<z.infer<typeof formSchema>> = async (
     values
@@ -263,6 +266,7 @@ export default function EditServiceOrderPage() {
     try {
       const payload = {
         ...values,
+        reportAttachments: values.reportAttachments || [],
         dueDate: values.dueDate ? new Date(values.dueDate).toISOString() : null,
         plannedStartDate: values.plannedStartDate
           ? new Date(values.plannedStartDate).toISOString()
@@ -278,7 +282,6 @@ export default function EditServiceOrderPage() {
           values.serviceOrderCost !== null
             ? parseFloat(values.serviceOrderCost as any)
             : null,
-        reportAttachments: values.reportAttachments || [],
       };
 
       const response = await fetch(`/api/service-orders/${id}`, {
@@ -705,86 +708,130 @@ export default function EditServiceOrderPage() {
             </div>
 
             {/* Upload de Relatório/Anexo */}
+            {/* Upload de Relatório/Anexo */}
             <div className="space-y-2">
               <Label className="font-semibold">Anexar Relatório</Label>
               <div className="flex items-center gap-4">
-              <input
-                name="file"
-                ref={inputFileRef}
-                type="file"
-                accept="image/jpeg, image/png, image/webp,application/pdf"
-                className="block w-full text-sm text-gray-700 border border-gray-300 rounded-md cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="flex items-center gap-2"
-                onClick={async () => {
-                if (!inputFileRef.current?.files?.length) {
-                  toast.error("Selecione um arquivo para anexar.");
-                  return;
-                }
-                const file = inputFileRef.current.files[0];
-                try {
-                  const response = await fetch(
-                  `/api/avatar/upload?filename=${file.name}`,
-                  {
-                    method: "POST",
-                    body: file,
-                  }
-                  );
-                  if (!response.ok) {
-                  toast.error("Falha ao fazer upload do arquivo.");
-                  return;
-                  }
-                  const newBlob = (await response.json()) as PutBlobResult;
-                  setBlob(newBlob);
-                  // Adiciona o novo anexo à lista de anexos do formulário
-                  form.setValue("reportAttachments", [
-                  ...(form.getValues("reportAttachments") || []),
-                  newBlob.url,
-                  ]);
-                  toast.success("Arquivo anexado com sucesso!");
-                  // Limpa o input
-                  if (inputFileRef.current) inputFileRef.current.value = "";
-                } catch (err) {
-                  toast.error("Erro ao anexar arquivo.");
-                }
-                }}
-              >
-                <PaperclipIcon className="h-5 w-5" />
-                Anexar
-              </Button>
+                <input
+                  name="file"
+                  ref={inputFileRef}
+                  type="file"
+                  accept="image/jpeg, image/png, image/webp,application/pdf"
+                  className="block w-full text-sm text-gray-700 border border-gray-300 rounded-md cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  onClick={async () => {
+                    if (!inputFileRef.current?.files?.length) {
+                      toast.error("Selecione um arquivo para anexar.");
+                      return;
+                    }
+                    const file = inputFileRef.current.files[0];
+                    try {
+                      const response = await fetch(
+                        `/api/blob/upload?filename=${file.name}`,
+                        {
+                          method: "POST",
+                          body: file,
+                        }
+                      );
+                      if (!response.ok) {
+                        toast.error("Falha ao fazer upload do arquivo.");
+                        return;
+                      }
+                      const newBlob = (await response.json()) as PutBlobResult;
+                      setBlob(newBlob);
+                      form.setValue("reportAttachments", [
+                        ...(form.getValues("reportAttachments") || []),
+                        newBlob.url,
+                      ]);
+                      toast.success("Arquivo anexado com sucesso!");
+                      if (inputFileRef.current) inputFileRef.current.value = "";
+                    } catch (err) {
+                      toast.error("Erro ao anexar arquivo.");
+                    }
+                  }}
+                >
+                  <PaperclipIcon className="h-5 w-5" />
+                  Anexar
+                </Button>
               </div>
               {blob && (
-              <div className="text-xs text-gray-500">
-                Último anexo:{" "}
-                <a
-                href={blob.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 underline"
-                >
-                {blob.url}
-                </a>
-              </div>
+                <div className="text-xs text-gray-500">
+                  Último anexo:{" "}
+                  <a
+                    href={blob.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 underline"
+                  >
+                    {blob.url}
+                  </a>
+                </div>
               )}
 
-              <ul className="list-disc pl-5 mt-2">
-              {form.watch("reportAttachments")?.map((url, index) => (
-                <li key={index}>
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  Anexo {index + 1}
-                </a>
-                </li>
-              ))}
-              </ul>
+              {/* Lista de anexos já existentes */}
+              <div className="mt-6">
+                <h3 className="font-semibold text-lg text-gray-800 mb-2">
+                  Anexos da Ordem de Serviço
+                </h3>
+                {form.watch("reportAttachments")?.length > 0 ? (
+                  <ul className="space-y-2">
+                    {form.watch("reportAttachments").map((url, index) => (
+                      <li
+                        key={index}
+                        className="flex justify-between items-center bg-gray-100 px-3 py-2 rounded"
+                      >
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 underline break-all"
+                        >
+                          {url.split("/").pop()}
+                        </a>
+                        <ConfirmDeleteAttachment
+                          fileUrl={url}
+                          onConfirm={async () => {
+                            try {
+                              const res = await fetch(`/api/blob/delete`, {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({ url }),
+                              });
+
+                              if (!res.ok) {
+                                throw new Error("Erro ao excluir o arquivo.");
+                              }
+
+                              const updated =
+                                form
+                                  .getValues("reportAttachments")
+                                  ?.filter((_, i) => i !== index) || [];
+                              form.setValue("reportAttachments", updated);
+                            } catch (error) {
+                              toast.error("Erro ao excluir o anexo.");
+                            }
+                          }}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-500">Nenhum anexo cadastrado.</p>
+                )}
+                {form.formState.errors.reportAttachments && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {form.formState.errors.reportAttachments.message}
+                  </p>
+                )}
+              </div>
             </div>
+            {/* Fim do Upload de Relatório/Anexo */}
           </form>
         </CardContent>
       </Card>

@@ -80,27 +80,13 @@ export default function ServiceOrderDetailsPage() {
     );
   };
 
+  // Controla se já foi feita a verificação/autenticação e busca
+  const [hasFetched, setHasFetched] = useState(false);
+
   const fetchServiceOrder = async (orderId: string) => {
     setLoading(true);
     setError(null);
     try {
-      if (status === "loading") return;
-      if (
-        status === "unauthenticated" ||
-        !(session?.user?.email as string)?.endsWith("@starnav.com.br")
-      ) {
-        toast.error("Acesso negado. Por favor, faça login.");
-        router.push("/login");
-        return;
-      }
-      if (!hasPermission(session?.user?.role, session?.user?.sector)) {
-        toast.error(
-          "Você não tem permissão para visualizar esta Ordem de Serviço."
-        );
-        router.push("/dashboard");
-        return;
-      }
-
       const response = await fetch(`/api/service-orders/${orderId}`);
       if (!response.ok) {
         const errorData = await response.json();
@@ -121,10 +107,19 @@ export default function ServiceOrderDetailsPage() {
   };
 
   useEffect(() => {
-    if (id && status !== "loading") {
+    if (
+      !hasFetched &&
+      id &&
+      status !== "loading" &&
+      status !== "unauthenticated" &&
+      (session?.user?.email as string)?.endsWith("@starnav.com.br") &&
+      hasPermission(session?.user?.role, session?.user?.sector)
+    ) {
       fetchServiceOrder(id);
+      setHasFetched(true);
     }
-  }, [id, status, session, router]);
+    // Se não autenticado, não faz fetch e deixa o fluxo de autenticação tratar
+  }, [id, status, session, hasFetched]);
 
   const handleDelete = async () => {
     if (
