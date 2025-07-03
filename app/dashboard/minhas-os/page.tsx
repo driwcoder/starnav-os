@@ -112,7 +112,6 @@ export default async function MinhasOSPage({
           in: [
             OrderStatus.AGUARDANDO_SUPRIMENTOS,
             OrderStatus.CONTRATADA,
-            OrderStatus.EM_EXECUCAO,
           ],
         };
       } else {

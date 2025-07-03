@@ -342,6 +342,7 @@ export default function ServiceOrderDetailsPage() {
                 ? formatDate(serviceOrder.plannedEndDate)
                 : "Não programado"}
             </p>
+
             <p className="text-gray-700">
               <strong>Tipo de Solução:</strong>{" "}
               {serviceOrder.solutionType
@@ -373,12 +374,15 @@ export default function ServiceOrderDetailsPage() {
                 ? formatDate(serviceOrder.contractDate)
                 : "N/A"}
             </p>
-            <p className="text-gray-700">
-              <strong>Custo do Serviço:</strong>{" "}
-              {serviceOrder.serviceOrderCost
-                ? `R$ ${serviceOrder.serviceOrderCost.toFixed(2)}`
-                : "N/A"}
-            </p>
+            {session?.user.sector === "SUPRIMENTOS" && (
+              <p className="text-gray-700">
+                <strong>Custo do Serviço:</strong>{" "}
+                {serviceOrder.serviceOrderCost
+                  ? `R$ ${serviceOrder.serviceOrderCost.toFixed(2)}`
+                  : "N/A"}
+              </p>
+            )}
+
             <p className="text-gray-700">
               <strong>Notas do Suprimentos:</strong>{" "}
               {serviceOrder.supplierNotes || "N/A"}
@@ -429,14 +433,16 @@ export default function ServiceOrderDetailsPage() {
               <Button>Editar OS</Button>
             </Link>
             <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="destructive"
-                  className="flex items-center gap-2"
-                >
-                  <Trash2Icon className="h-4 w-4" /> Excluir OS
-                </Button>
-              </AlertDialogTrigger>
+              {session?.user.sector === "SUPRIMENTOS" && (
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    className="flex items-center gap-2"
+                  >
+                    <Trash2Icon className="h-4 w-4" /> Excluir OS
+                  </Button>
+                </AlertDialogTrigger>
+              )}
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>

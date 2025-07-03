@@ -195,7 +195,9 @@ export default function EditServiceOrderPage() {
       .then(async (response) => {
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.message || "Erro ao carregar Ordem de Serviço.");
+          throw new Error(
+            errorData.message || "Erro ao carregar Ordem de Serviço."
+          );
         }
         return response.json();
       })
@@ -204,12 +206,23 @@ export default function EditServiceOrderPage() {
         setError(null);
       })
       .catch((err: any) => {
-        setError(err.message || "Não foi possível carregar a Ordem de Serviço.");
-        toast.error("Erro ao carregar OS: " + (err.message || "Erro desconhecido."));
+        setError(
+          err.message || "Não foi possível carregar a Ordem de Serviço."
+        );
+        toast.error(
+          "Erro ao carregar OS: " + (err.message || "Erro desconhecido.")
+        );
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, status, session?.user?.email, session?.user?.role, session?.user?.sector, router]);
+  }, [
+    id,
+    status,
+    session?.user?.email,
+    session?.user?.role,
+    session?.user?.sector,
+    router,
+  ]);
 
   // 2. Resetar o formulário apenas quando serviceOrder mudar
   useEffect(() => {
@@ -620,71 +633,80 @@ export default function EditServiceOrderPage() {
 
             <hr className="my-4 col-span-full" />
 
-            <h3 className="font-semibold text-lg text-gray-800 col-span-full">
-              Informações de Suprimentos
-            </h3>
-            <div>
-              <Label htmlFor="contractedCompany">
-                Empresa Contratada (Opcional)
-              </Label>
-              <Input
-                id="contractedCompany"
-                {...form.register("contractedCompany")}
-                placeholder="Ex: XYZ Eletrica Naval"
-              />
-              {form.formState.errors.contractedCompany && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.contractedCompany.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="contractDate">
-                Data da Contratação (Opcional)
-              </Label>
-              <Input
-                id="contractDate"
-                type="date"
-                {...form.register("contractDate")}
-              />
-              {form.formState.errors.contractDate && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.contractDate.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="serviceOrderCost">Custo do Serviço (R$)</Label>
-              <Input
-                id="serviceOrderCost"
-                type="number"
-                step="0.01"
-                {...form.register("serviceOrderCost", { valueAsNumber: true })}
-                placeholder="Ex: 3500.00"
-              />
-              {form.formState.errors.serviceOrderCost && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.serviceOrderCost.message}
-                </p>
-              )}
-            </div>
-            <div className="col-span-full">
-              <Label htmlFor="supplierNotes">
-                Notas do Suprimentos (Opcional)
-              </Label>
-              <Textarea
-                id="supplierNotes"
-                {...form.register("supplierNotes")}
-                rows={3}
-                placeholder="Anotações do setor de suprimentos sobre a contratação."
-              />
-              {form.formState.errors.supplierNotes && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.supplierNotes.message}
-                </p>
-              )}
-            </div>
+            {session?.user.sector === "SUPRIMENTOS" && (
+              <>
+                <h3 className="font-semibold text-lg text-gray-800 col-span-full">
+                  Informações de Suprimentos
+                </h3>
+                <div>
+                  <Label htmlFor="contractedCompany">
+                    Empresa Contratada (Opcional)
+                  </Label>
+                  <Input
+                    id="contractedCompany"
+                    {...form.register("contractedCompany")}
+                    placeholder="Ex: XYZ Eletrica Naval"
+                  />
+                  {form.formState.errors.contractedCompany && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {form.formState.errors.contractedCompany.message}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="contractDate">
+                    Data da Contratação (Opcional)
+                  </Label>
+                  <Input
+                    id="contractDate"
+                    type="date"
+                    {...form.register("contractDate")}
+                  />
+                  {form.formState.errors.contractDate && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {form.formState.errors.contractDate.message}
+                    </p>
+                  )}
+                </div>
 
+                <div>
+                  <Label htmlFor="serviceOrderCost">
+                    Custo do Serviço (R$)
+                  </Label>
+                  <Input
+                    id="serviceOrderCost"
+                    type="number"
+                    step="0.01"
+                    {...form.register("serviceOrderCost", {
+                      valueAsNumber: true,
+                    })}
+                    placeholder="Ex: 3500.00"
+                  />
+                  {form.formState.errors.serviceOrderCost && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {form.formState.errors.serviceOrderCost.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="col-span-full">
+                  <Label htmlFor="supplierNotes">
+                    Notas do Suprimentos (Opcional)
+                  </Label>
+                  <Textarea
+                    id="supplierNotes"
+                    {...form.register("supplierNotes")}
+                    rows={3}
+                    placeholder="Anotações do setor de suprimentos sobre a contratação."
+                  />
+                  {form.formState.errors.supplierNotes && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {form.formState.errors.supplierNotes.message}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
             {/* Botões de Ação */}
             <div className="flex gap-4 col-span-full mt-6">
               <Button
