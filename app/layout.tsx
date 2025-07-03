@@ -16,7 +16,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Starnav System",
-  description: "Gerenciamento de processos da empresa Starnav Serviços Maritimos",
+  description:
+    "Gerenciamento de processos da empresa Starnav Serviços Maritimos",
 };
 
 export default function RootLayout({

@@ -20,7 +20,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-white">
-      <div className="container flex h-16 items-center justify-between py-4">
+      <div className="flex h-16 pr-4 items-center justify-between py-4 w-full">
         <div className="flex items-center">
           {/* Botão para abrir o menu lateral em telas menores */}
           <Sheet>
@@ -34,23 +34,37 @@ export default function Header() {
                 <SheetTitle>Navegação</SheetTitle>
                 <SheetDescription>Menu principal do Starnav</SheetDescription>
               </SheetHeader>
-              <nav className="flex flex-col space-y-4 pt-6">
+              <nav className="flex flex-col pl-4 space-y-4 pt-6">
                 <Link
-                  href="/"
-                  className="text-lg font-medium text-gray-700 hover:text-indigo-600"
+                  href="/dashboard/minhas-os"
+                  className="text-lg font-medium text-gray-700 hover:text-[#10679f]"
                 >
-                  Dashboard
+                  Minhas Ordens de Serviço
                 </Link>
                 <Link
                   href="/dashboard/service-orders"
-                  className="text-lg font-medium text-gray-700 hover:text-indigo-600"
+                  className="text-lg font-medium text-gray-700 hover:text-[#10679f]"
                 >
                   Ordens de Serviço
                 </Link>
+                <Link
+                  href="/dashboard/materials"
+                  className="text-lg font-medium text-gray-700 hover:text-[#10679f]"
+                >
+                  Materiais
+                </Link>
+                {session?.user?.role === "ADMIN" && (
+                  <Link
+                    href="/dashboard/users"
+                    className="text-lg font-medium text-gray-700 hover:text-[#10679f]"
+                  >
+                    Usuários
+                  </Link>
+                )}
               </nav>
             </SheetContent>
           </Sheet>
-          <h1 className="ml-4 text-2xl font-bold text-black">
+          <h1 className="hidden md:block ml-4 text-2xl font-bold text-black">
             <Image
               src="/STARNAV_ServicosMaritimosLtda_Branco_Preto.svg"
               alt="Starnav"

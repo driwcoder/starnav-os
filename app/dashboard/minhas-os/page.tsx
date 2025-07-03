@@ -1,120 +1,151 @@
+// app/dashboard/minhas-os/page.tsx
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { UserRole, UserSector, OrderStatus } from "@prisma/client";
-import StatusSummaryCard from "./components/StatusSummaryCard";
-import OrderList from "./components/OrderList";
-import FilterToggle from "./components/FilterToggle";
-
-interface ServiceOrdersPageProps {
-  searchParams: any; // Mantenha como 'any' para evitar erros de tipagem persistentes
+// Define enums locally since they are not exported from @prisma/client
+enum UserRole {
+  ADMIN = "ADMIN",
+  USER = "USER",
+  // add other roles as needed
 }
 
-export default async function MinhasOSPage(props: ServiceOrdersPageProps) {
+enum UserSector {
+  TRIPULACAO = "TRIPULACAO",
+  MANUTENCAO = "MANUTENCAO",
+  OPERACAO = "OPERACAO",
+  SUPRIMENTOS = "SUPRIMENTOS",
+  // add other sectors as needed
+}
+
+enum OrderStatus {
+  PENDENTE = "PENDENTE",
+  EM_ANALISE = "EM_ANALISE",
+  APROVADA = "APROVADA",
+  RECUSADA = "RECUSADA",
+  PLANEJADA = "PLANEJADA",
+  AGUARDANDO_SUPRIMENTOS = "AGUARDANDO_SUPRIMENTOS",
+  EM_EXECUCAO = "EM_EXECUCAO",
+  AGUARDANDO_PECAS = "AGUARDANDO_PECAS",
+  CONTRATADA = "CONTRATADA",
+  CONCLUIDA = "CONCLUIDA",
+  CANCELADA = "CANCELADA",
+  // add other statuses as needed
+}
+import StatusSummaryCard from "./components/StatusSummaryCard"; // Verifique o caminho real
+import OrderList from "./components/OrderList"; // Verifique o caminho real
+import FilterToggle from "./components/FilterToggle"; // Verifique o caminho real
+
+export default async function MinhasOSPage({
+  searchParams,
+}: {
+  searchParams?: any;
+}) {
+  // ✅ CORREÇÃO: Tipagem direta com 'any'
   const session = await getServerSession(authOptions);
 
   if (!session || !session.user?.email.endsWith("@starnav.com.br")) {
     redirect("/login");
   }
 
-  const searchParams = props.searchParams;
+  // ✅ CORREÇÃO: Await searchParams explicitamente
+  const actualSearchParams = await searchParams;
+  const historico = actualSearchParams?.historico === "true";
 
-  const historico = searchParams?.historico === "true";
+  const userRole = session.user.role;
   const userSector = session.user.sector;
+  const userId = session.user.id;
 
-  const filters = [];
+  const whereClause: any = {};
 
-  if (!historico) {
-    // Tripulação: vê apenas OS criadas por usuários do setor TRIPULACAO e status iniciais
-
-    if (session.user.sector === "TRIPULACAO") {
-      filters.push({
-        status: {
-          in: [
-            "PENDENTE",
-            "EM_ANALISE",
-            "RECUSADA",
-            "AGUARDANDO_PECAS",
-          ] as OrderStatus[],
-        },
-      });
+  if (userRole === UserRole.ADMIN) {
+    if (historico) {
+      whereClause.status = {
+        in: [OrderStatus.CONCLUIDA, OrderStatus.CANCELADA],
+      };
+    } else {
+      whereClause.status = {
+        notIn: [OrderStatus.CONCLUIDA, OrderStatus.CANCELADA],
+      };
     }
-    // Manutenção / Operação: assignedTo → setor = MANUTENCAO ou OPERACAO
-    if (
-      session.user.sector === "MANUTENCAO" ||
-      session.user.sector === "OPERACAO"
-    ) {
-      filters.push({
-        status: {
+  } else {
+    if (historico) {
+      whereClause.status = {
+        in: [OrderStatus.CONCLUIDA, OrderStatus.CANCELADA],
+      };
+    } else {
+      if (userSector === UserSector.TRIPULACAO) {
+        whereClause.AND = [
+          {
+            OR: [{ createdById: userId }, { assignedToId: userId }],
+          },
+          {
+            status: {
+              in: [
+                OrderStatus.PENDENTE,
+                OrderStatus.EM_ANALISE,
+                OrderStatus.RECUSADA,
+                OrderStatus.AGUARDANDO_PECAS,
+                OrderStatus.EM_EXECUCAO,
+              ],
+            },
+          },
+        ];
+      } else if (
+        userSector === UserSector.MANUTENCAO ||
+        userSector === UserSector.OPERACAO
+      ) {
+        whereClause.status = {
           in: [
-            "PLANEJADA",
-            "EM_EXECUCAO",
-            "AGUARDANDO_PECAS",
-            "APROVADA",
-            "RECUSADA",
-          ] as OrderStatus[],
-        },
-      });
-    }
-
-    // Suprimentos: vê todas as OS com status AGUARDANDO_SUPRIMENTOS ou CONTRATADA
-    if (session.user.sector === "SUPRIMENTOS") {
-      filters.push({
-        status: {
-          in: ["AGUARDANDO_SUPRIMENTOS", "CONTRATADA"] as OrderStatus[],
-        },
-      });
+            OrderStatus.PENDENTE,
+            OrderStatus.EM_ANALISE,
+            OrderStatus.APROVADA,
+            OrderStatus.RECUSADA,
+            OrderStatus.PLANEJADA,
+            OrderStatus.AGUARDANDO_SUPRIMENTOS,
+            OrderStatus.EM_EXECUCAO,
+            OrderStatus.AGUARDANDO_PECAS,
+          ],
+        };
+      } else if (userSector === UserSector.SUPRIMENTOS) {
+        whereClause.status = {
+          in: [
+            OrderStatus.AGUARDANDO_SUPRIMENTOS,
+            OrderStatus.CONTRATADA,
+            OrderStatus.EM_EXECUCAO,
+          ],
+        };
+      } else {
+        whereClause.createdById = userId;
+        whereClause.status = {
+          notIn: [OrderStatus.CONCLUIDA, OrderStatus.CANCELADA],
+        };
+      }
     }
   }
-
-  const whereClause = historico
-    ? {
-        status: {
-          in: ["CONCLUIDA", "CANCELADA"] as OrderStatus[],
-        },
-      }
-    : {
-        OR: filters,
-      };
 
   const serviceOrders = await prisma.serviceOrder.findMany({
     where: whereClause,
+    orderBy: { requestedAt: "desc" },
+    include: {
+      createdBy: {
+        select: { name: true, email: true, role: true, sector: true },
+      },
+      assignedTo: {
+        select: { name: true, email: true, role: true, sector: true },
+      },
+    },
   });
-  if (userSector === UserSector.ADMINISTRACAO) {
-    // Admin vê todas as OS
-    serviceOrders.push(
-      ...(await prisma.serviceOrder.findMany({
-        where: {
-          status: {
-            in: [
-              "PENDENTE",
-              "EM_ANALISE",
-              "APROVADA",
-              "RECUSADA",
-            ] as OrderStatus[],
-          },
-        },
-      }))
-    );
-  }
 
-  const resumoPorStatus: Record<OrderStatus, number> = {
-    PENDENTE: 0,
-    EM_ANALISE: 0,
-    APROVADA: 0,
-    RECUSADA: 0,
-    PLANEJADA: 0,
-    AGUARDANDO_SUPRIMENTOS: 0,
-    CONTRATADA: 0,
-    EM_EXECUCAO: 0,
-    AGUARDANDO_PECAS: 0,
-    CONCLUIDA: 0,
-    CANCELADA: 0,
-  };
+  const resumoPorStatus: Record<OrderStatus, number> = Object.values(
+    OrderStatus
+  ).reduce((acc, status) => {
+    acc[status] = 0;
+    return acc;
+  }, {} as Record<OrderStatus, number>);
 
   for (const o of serviceOrders) {
-    resumoPorStatus[o.status]++;
+    resumoPorStatus[o.status as OrderStatus]++;
   }
 
   return (

@@ -18,7 +18,7 @@ export default function FilterToggle({ historico }: { historico: boolean }) {
     <div className="flex items-center space-x-4">
       <Switch id="historico" checked={historico} onCheckedChange={toggle} />
       <Label htmlFor="historico">
-        {historico ? "Exibindo Histórico" : "Exibindo Pendentes"}
+        {historico ? "Exibindo Concluídas" : "OSs à Tratar"}
       </Label>
     </div>
   );
