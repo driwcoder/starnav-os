@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import type { PutBlobResult } from '@vercel/blob';
-import { useState, useRef } from 'react';
+import type { PutBlobResult } from "@vercel/blob";
+import { useState, useRef } from "react";
 
 export default function BlobUploadPage() {
   const inputFileRef = useRef<HTMLInputElement>(null);
@@ -23,9 +23,9 @@ export default function BlobUploadPage() {
           const response = await fetch(
             `/api/blob/upload?filename=${file.name}`,
             {
-              method: 'POST',
+              method: "POST",
               body: file,
-            },
+            }
           );
 
           const newBlob = (await response.json()) as PutBlobResult;
@@ -33,7 +33,13 @@ export default function BlobUploadPage() {
           setBlob(newBlob);
         }}
       >
-        <input name="file" ref={inputFileRef} type="file" accept="image/jpeg, image/png, image/webp" required />
+        <input
+          name="file"
+          ref={inputFileRef}
+          type="file"
+          accept="image/jpeg, image/png, image/webp"
+          required
+        />
         <button type="submit">Upload</button>
       </form>
       {blob && (

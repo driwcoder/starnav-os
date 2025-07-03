@@ -1,7 +1,7 @@
 // app/dashboard/users/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -87,7 +87,8 @@ export default function UsersPage() {
     },
   });
 
-  const fetchUsers = async () => {
+
+  const fetchUsers = useCallback(async () => {
     setLoadingUsers(true);
     setError(null);
     try {
@@ -123,7 +124,7 @@ export default function UsersPage() {
     } finally {
       setLoadingUsers(false);
     }
-  };
+  }, [status, session, router, query, roleFilter]);
 
   useEffect(() => {
     if (status !== "loading") {
