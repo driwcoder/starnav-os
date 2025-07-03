@@ -3,54 +3,31 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-// Define enums locally since they are not exported from @prisma/client
-enum UserRole {
-  ADMIN = "ADMIN",
-  USER = "USER",
-  // add other roles as needed
-}
+import { OrderStatus, UserRole, UserSector } from "@prisma/client"; // Importe enums do Prisma
+import StatusSummaryCard from "./components/StatusSummaryCard";
+import OrderList from "./components/OrderList";
+import StatusFilter from "./components/StatusFilter"; // Importe StatusFilter
 
-enum UserSector {
-  TRIPULACAO = "TRIPULACAO",
-  MANUTENCAO = "MANUTENCAO",
-  OPERACAO = "OPERACAO",
-  SUPRIMENTOS = "SUPRIMENTOS",
-  // add other sectors as needed
-}
-
-enum OrderStatus {
-  PENDENTE = "PENDENTE",
-  EM_ANALISE = "EM_ANALISE",
-  APROVADA = "APROVADA",
-  RECUSADA = "RECUSADA",
-  PLANEJADA = "PLANEJADA",
-  AGUARDANDO_SUPRIMENTOS = "AGUARDANDO_SUPRIMENTOS",
-  EM_EXECUCAO = "EM_EXECUCAO",
-  AGUARDANDO_PECAS = "AGUARDANDO_PECAS",
-  CONTRATADA = "CONTRATADA",
-  CONCLUIDA = "CONCLUIDA",
-  CANCELADA = "CANCELADA",
-  // add other statuses as needed
-}
-import StatusSummaryCard from "./components/StatusSummaryCard"; // Verifique o caminho real
-import OrderList from "./components/OrderList"; // Verifique o caminho real
-import FilterToggle from "./components/FilterToggle"; // Verifique o caminho real
-
-export default async function MinhasOSPage({
-  searchParams,
-}: {
-  searchParams?: any;
-}) {
-  // ✅ CORREÇÃO: Tipagem direta com 'any'
+// Remova a interface MinhasOSPageProps.
+// export default async function MinhasOSPage({ searchParams }: MinhasOSPageProps) {
+// ✅ CORREÇÃO: Tipagem direta das props com 'any' para contornar o problema do compilador
+export default async function MinhasOSPage({ searchParams }: any) {
   const session = await getServerSession(authOptions);
 
   if (!session || !session.user?.email.endsWith("@starnav.com.br")) {
     redirect("/login");
   }
 
-  // ✅ CORREÇÃO: Await searchParams explicitamente
+  // ✅ CORREÇÃO: Await searchParams explicitamente, conforme a diretriz.
   const actualSearchParams = await searchParams;
-  const historico = actualSearchParams?.historico === "true";
+
+  // Removido 'historico' daqui para simplificar o problema atual.
+  // Se precisar de 'historico', ele deve ser adicionado via 'searchParams' na URL e aqui.
+  // const historico = actualSearchParams?.historico === "true";
+
+  const statusFilter = actualSearchParams?.statusFilter
+    ? actualSearchParams.statusFilter.split(",")
+    : [];
 
   const userRole = session.user.role;
   const userSector = session.user.sector;
@@ -58,69 +35,69 @@ export default async function MinhasOSPage({
 
   const whereClause: any = {};
 
+  // Lógica para Admin e outros usuários (mantida do código anterior, sem historico por enquanto)
   if (userRole === UserRole.ADMIN) {
-    if (historico) {
+    whereClause.status = {
+      notIn: [OrderStatus.CONCLUIDA, OrderStatus.CANCELADA],
+    };
+  } else {
+    if (userSector === UserSector.TRIPULACAO) {
+      whereClause.AND = [
+        {
+          OR: [
+            { createdById: userId },
+            { assignedToId: userId }
+          ]
+        },
+        {
+          status: {
+            in: [
+              OrderStatus.PENDENTE,
+              OrderStatus.EM_ANALISE,
+              OrderStatus.RECUSADA,
+              OrderStatus.AGUARDANDO_PECAS,
+              OrderStatus.EM_EXECUCAO,
+            ],
+          },
+        },
+      ];
+    }
+    else if (userSector === UserSector.MANUTENCAO || userSector === UserSector.OPERACAO) {
       whereClause.status = {
-        in: [OrderStatus.CONCLUIDA, OrderStatus.CANCELADA],
+        in: [
+          OrderStatus.PENDENTE,
+          OrderStatus.EM_ANALISE,
+          OrderStatus.APROVADA,
+          OrderStatus.RECUSADA,
+          OrderStatus.PLANEJADA,
+          OrderStatus.AGUARDANDO_SUPRIMENTOS,
+          OrderStatus.EM_EXECUCAO,
+          OrderStatus.AGUARDANDO_PECAS,
+        ],
       };
-    } else {
+    }
+    else if (userSector === UserSector.SUPRIMENTOS) {
+      whereClause.status = {
+        in: [
+          OrderStatus.AGUARDANDO_SUPRIMENTOS,
+          OrderStatus.CONTRATADA,
+          OrderStatus.EM_EXECUCAO,
+        ],
+      };
+    }
+    else {
+      whereClause.createdById = userId;
       whereClause.status = {
         notIn: [OrderStatus.CONCLUIDA, OrderStatus.CANCELADA],
       };
     }
-  } else {
-    if (historico) {
-      whereClause.status = {
-        in: [OrderStatus.CONCLUIDA, OrderStatus.CANCELADA],
-      };
-    } else {
-      if (userSector === UserSector.TRIPULACAO) {
-        whereClause.AND = [
-          {
-            OR: [{ createdById: userId }, { assignedToId: userId }],
-          },
-          {
-            status: {
-              in: [
-                OrderStatus.PENDENTE,
-                OrderStatus.EM_ANALISE,
-                OrderStatus.RECUSADA,
-                OrderStatus.AGUARDANDO_PECAS,
-                OrderStatus.EM_EXECUCAO,
-              ],
-            },
-          },
-        ];
-      } else if (
-        userSector === UserSector.MANUTENCAO ||
-        userSector === UserSector.OPERACAO
-      ) {
-        whereClause.status = {
-          in: [
-            OrderStatus.PENDENTE,
-            OrderStatus.EM_ANALISE,
-            OrderStatus.APROVADA,
-            OrderStatus.RECUSADA,
-            OrderStatus.PLANEJADA,
-            OrderStatus.AGUARDANDO_SUPRIMENTOS,
-            OrderStatus.EM_EXECUCAO,
-            OrderStatus.AGUARDANDO_PECAS,
-          ],
-        };
-      } else if (userSector === UserSector.SUPRIMENTOS) {
-        whereClause.status = {
-          in: [
-            OrderStatus.AGUARDANDO_SUPRIMENTOS,
-            OrderStatus.CONTRATADA,
-          ],
-        };
-      } else {
-        whereClause.createdById = userId;
-        whereClause.status = {
-          notIn: [OrderStatus.CONCLUIDA, OrderStatus.CANCELADA],
-        };
-      }
-    }
+  }
+
+  // Aplicar filtro de status da URL, se houver
+  if (statusFilter && statusFilter.length > 0 && statusFilter[0] !== "TODOS") {
+    whereClause.status = {
+      in: statusFilter as OrderStatus[],
+    };
   }
 
   const serviceOrders = await prisma.serviceOrder.findMany({
@@ -150,8 +127,12 @@ export default async function MinhasOSPage({
   return (
     <div className="container mx-auto py-6">
       <h1 className="text-2xl font-bold mb-4">Minhas Ordens de Serviço</h1>
-
-      <FilterToggle historico={historico} />
+      {/* O componente FilterToggle foi removido na última sugestão,
+          se você o recolocou, remova-o novamente para simplificar. */}
+      {/* <FilterToggle historico={historico} /> */}
+      
+      {/* Passa o filtro atual para o StatusFilter componente */}
+      <StatusFilter currentFilter={statusFilter} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
         {Object.entries(resumoPorStatus)
@@ -164,7 +145,6 @@ export default async function MinhasOSPage({
             />
           ))}
       </div>
-
       <div className="mt-10">
         <OrderList os={serviceOrders} />
       </div>

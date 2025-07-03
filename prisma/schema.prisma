@@ -22,39 +22,8 @@ model User {
   // Relações
   createdServiceOrders ServiceOrder[] @relation("CreatedBy")
   assignedServiceOrders ServiceOrder[] @relation("AssignedTo")
-}
 
-// Enum para os CARGOS do usuário
-enum UserRole {
-  ADMIN
-  GESTOR
-  SUPERVISOR
-  COORDENADOR
-  COMPRADOR_JUNIOR
-  COMPRADOR_PLENO
-  COMPRADOR_SENIOR
-  COMANDANTE
-  IMEDIATO
-  OQN
-  CHEFE_MAQUINAS
-  SUB_CHEFE_MAQUINAS
-  OQM
-  ASSISTENTE
-  AUXILIAR
-  ESTAGIARIO
-}
-
-// Enum: Setor do usuário
-enum UserSector {
-  ADMINISTRACAO
-  MANUTENCAO
-  OPERACAO
-  SUPRIMENTOS
-  ALMOXARIFADO
-  RH
-  TI
-  TRIPULACAO
-  NAO_DEFINIDO
+  DashboardPreference DashboardPreference[]
 }
 
 // Modelo para a Ordem de Serviço (OS)
@@ -94,6 +63,48 @@ model ServiceOrder {
 
   assignedTo         User?          @relation("AssignedTo", fields: [assignedToId], references: [id])
   assignedToId       String?
+}
+
+model DashboardPreference {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  statuses  String[] @default([]) // Ex: ["PENDENTE", "EM_ANALISE", "CONTRATADA"]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Enum para os CARGOS do usuário
+enum UserRole {
+  ADMIN
+  GESTOR
+  SUPERVISOR
+  COORDENADOR
+  COMPRADOR_JUNIOR
+  COMPRADOR_PLENO
+  COMPRADOR_SENIOR
+  COMANDANTE
+  IMEDIATO
+  OQN
+  CHEFE_MAQUINAS
+  SUB_CHEFE_MAQUINAS
+  OQM
+  ASSISTENTE
+  AUXILIAR
+  ESTAGIARIO
+}
+
+// Enum: Setor do usuário
+enum UserSector {
+  ADMINISTRACAO
+  MANUTENCAO
+  OPERACAO
+  SUPRIMENTOS
+  ALMOXARIFADO
+  RH
+  TI
+  TRIPULACAO
+  NAO_DEFINIDO
 }
 
 // Enum para os status da Ordem de Serviço
