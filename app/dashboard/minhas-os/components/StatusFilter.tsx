@@ -62,9 +62,28 @@ export default function StatusFilter({ currentFilter }: StatusFilterProps) {
     );
   };
 
-  const savePreferences = () => {
+  const savePreferences = async () => {
     localStorage.setItem("minhasOsStatusFilter", JSON.stringify(selected)); // ✅ NOVO: Chave específica
-    toast.success("Preferências salvas.");
+
+    // Salva no banco de dados via API
+    try {
+      const res = await fetch("/api/dashboard-preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statuses: selected }),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(
+          `Erro ao salvar preferências no banco. Detalhes: ${errorText}`
+        );
+      }
+      toast.success("Preferências salvas.");
+    } catch (error: any) {
+      toast.error(
+        `Erro ao salvar preferências no banco de dados. ${error?.message || ""}`
+      );
+    }
 
     // ✅ NOVO: Atualiza a URL para que o Server Component possa reagir
     startTransition(() => {
@@ -148,7 +167,10 @@ export default function StatusFilter({ currentFilter }: StatusFilterProps) {
         )}
       </div>
       <Button
-        onClick={savePreferences}
+        onClick={() => {
+          savePreferences();
+          setOpen(false);
+        }}
         disabled={isPending || selected.length === 0}
       >
         {isPending ? "Salvando..." : "Salvar Preferências"}

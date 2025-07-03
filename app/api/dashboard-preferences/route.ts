@@ -33,6 +33,7 @@ export async function POST(request: Request) {
     create: {
       userId: session.user.id,
       statuses,
+      email: session.user.email || "",
     },
   });
 

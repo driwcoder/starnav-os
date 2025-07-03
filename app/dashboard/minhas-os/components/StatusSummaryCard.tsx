@@ -30,7 +30,9 @@ export default function StatusSummaryCard({
   return (
     <Card>
       <CardHeader className="flex items-center justify-between">
-        <CardTitle className="text-sm font-medium">{status.replace(/_/g, " ")}</CardTitle>
+        <CardTitle className="text-sm font-medium">
+          {status.replace(/_/g, " ")}
+        </CardTitle>
         {statusIcons[status]}
       </CardHeader>
       <CardContent>
