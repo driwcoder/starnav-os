@@ -7,9 +7,11 @@ import StatusSummaryCard from "./components/StatusSummaryCard";
 import OrderList from "./components/OrderList";
 import FilterToggle from "./components/FilterToggle";
 
-export default async function MinhasOSPage(props: {
-  searchParams?: { historico?: string };
-}) {
+interface ServiceOrdersPageProps {
+  searchParams: any; // Mantenha como 'any' para evitar erros de tipagem persistentes
+}
+
+export default async function MinhasOSPage(props: ServiceOrdersPageProps) {
   const session = await getServerSession(authOptions);
 
   if (!session || !session.user?.email.endsWith("@starnav.com.br")) {
