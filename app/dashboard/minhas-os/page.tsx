@@ -11,7 +11,7 @@ import StatusFilter from "./components/StatusFilter"; // Importe StatusFilter
 // ✅ CORREÇÃO: Tipagem direta das props com 'any' para contornar o problema do compilador
 export default async function MinhasOSPage({ searchParams }: any) {
   const session = await getServerSession(authOptions);
-
+  // gatilho deploy production
   if (!session || !session.user?.email.endsWith("@starnav.com.br")) {
     redirect("/login");
   }
