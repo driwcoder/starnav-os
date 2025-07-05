@@ -1,4 +1,4 @@
-import { UserRole, OrderStatus } from "@prisma/client";
+import { UserRole, OrderStatus, UserSector } from "@prisma/client";
 
 type Field = keyof {
   plannedStartDate: string;
@@ -14,21 +14,25 @@ type Field = keyof {
 
 export function canEditField(
   userRole: UserRole,
+  userSector: UserSector, // NOVO parâmetro
   field: Field,
   currentStatus: OrderStatus
 ): boolean {
-  const editableByRole: Record<Field, UserRole[]> = {
-    plannedStartDate: ["COORDENADOR"],
-    plannedEndDate: ["COORDENADOR"],
-    solutionType: ["COORDENADOR"],
-    responsibleCrew: ["COORDENADOR"],
-    coordinatorNotes: ["COORDENADOR"],
-    contractedCompany: ["COMPRADOR_PLENO", "COMPRADOR_SENIOR"],
-    contractDate: ["COMPRADOR_PLENO", "COMPRADOR_SENIOR"],
-    serviceOrderCost: ["COMPRADOR_PLENO", "COMPRADOR_SENIOR"],
-    supplierNotes: ["COMPRADOR_PLENO", "COMPRADOR_SENIOR"],
+  // Exemplo: só pode editar se for do setor OPERACOES ou SUPRIMENTOS, além da role
+  const editableByRoleAndSector: Record<Field, { roles: UserRole[]; sectors: UserSector[] }> = {
+    plannedStartDate: { roles: ["COORDENADOR"], sectors: ["OPERACAO", "MANUTENCAO"] },
+    plannedEndDate: { roles: ["COORDENADOR"], sectors: ["OPERACAO", "MANUTENCAO"] },
+    solutionType: { roles: ["COORDENADOR"], sectors: ["OPERACAO", "MANUTENCAO"] },
+    responsibleCrew: { roles: ["COORDENADOR"], sectors: ["OPERACAO", "MANUTENCAO"] },
+    coordinatorNotes: { roles: ["COORDENADOR"], sectors: ["OPERACAO", "MANUTENCAO"] },
+    contractedCompany: { roles: ["COMPRADOR_PLENO", "COMPRADOR_SENIOR", "COMPRADOR_JUNIOR"], sectors: ["SUPRIMENTOS"] },
+    contractDate: { roles: ["COMPRADOR_PLENO", "COMPRADOR_SENIOR", "COMPRADOR_JUNIOR"], sectors: ["SUPRIMENTOS"] },
+    serviceOrderCost: { roles: ["COMPRADOR_PLENO", "COMPRADOR_SENIOR", "COMPRADOR_JUNIOR"], sectors: ["SUPRIMENTOS"] },
+    supplierNotes: { roles: ["COMPRADOR_PLENO", "COMPRADOR_SENIOR", "COMPRADOR_JUNIOR"], sectors: ["SUPRIMENTOS"] },
   };
 
-  const allowedRoles = editableByRole[field];
-  return allowedRoles?.includes(userRole);
+  const rule = editableByRoleAndSector[field];
+  if (!rule) return false;
+
+  return rule.roles.includes(userRole) && rule.sectors.includes(userSector);
 }

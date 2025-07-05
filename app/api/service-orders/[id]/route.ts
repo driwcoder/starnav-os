@@ -207,83 +207,39 @@ export async function PUT(request: Request, { params }: { params: any }) {
       });
     }
 
-    // 3. Lógica de permissão detalhada baseada em ROLE, SETOR e STATUS da OS
-    let canEdit = false;
-
-    // ADMIN: Sempre pode editar
-    if (userRole === UserRole.ADMIN) {
-      canEdit = true;
-    }
-    // COORDENADORES / GESTORES / SUPERVISORES (Manutenção/Operação):
-    else if (
-      [UserRole.GESTOR, UserRole.SUPERVISOR, UserRole.COORDENADOR].includes(
-        userRole as any
-      ) && // ✅ Adicionado 'as any'
-      [UserSector.MANUTENCAO, UserSector.OPERACAO].includes(userSector as any)
-    ) {
-      // ✅ Adicionado 'as any'
-      const allowedCoordinatorStatuses = [
-        OrderStatus.PENDENTE,
-        OrderStatus.EM_ANALISE,
-        OrderStatus.PLANEJADA,
-        OrderStatus.EM_EXECUCAO,
-        OrderStatus.AGUARDANDO_PECAS,
-        OrderStatus.RECUSADA,
-        OrderStatus.AGUARDANDO_SUPRIMENTOS,
-        OrderStatus.CONTRATADA,
-        OrderStatus.APROVADA,
-        OrderStatus.CONCLUIDA,
-        OrderStatus.CANCELADA,
-      ];
-      if (allowedCoordinatorStatuses.includes(existingOs.status)) {
-        canEdit = true;
+    // 3. Lógica de permissão baseada apenas em SETOR e STATUS da OS
+    const canEdit = (() => {
+      if (userSector === UserSector.TRIPULACAO) {
+        // Tripulação pode editar se status for PENDENTE ou RECUSADA
+        if (([OrderStatus.PENDENTE, OrderStatus.RECUSADA] as OrderStatus[]).includes(existingOs.status)) {
+          return true;
+        }
+        // Tripulação pode editar se status for EM_EXECUCAO e solutionType for INTERNA
+        if (
+          existingOs.status === OrderStatus.EM_EXECUCAO &&
+          validatedData.data.solutionType === SolutionType.INTERNA
+        ) {
+          return true;
+        }
+        return false;
       }
-    }
-    // COMPRADORES (Suprimentos):
-    else if (
-      [
-        UserRole.COMPRADOR_JUNIOR,
-        UserRole.COMPRADOR_PLENO,
-        UserRole.COMPRADOR_SENIOR,
-      ].includes(userRole as any) && // ✅ Adicionado 'as any'
-      userSector === UserSector.SUPRIMENTOS
-    ) {
-      const allowedBuyerStatuses: OrderStatus[] = [
-        OrderStatus.AGUARDANDO_SUPRIMENTOS,
-        OrderStatus.CONTRATADA,
-      ];
-      if (allowedBuyerStatuses.includes(existingOs.status)) {
-        canEdit = true;
+      if ([UserSector.MANUTENCAO, UserSector.OPERACAO].includes(userSector as any)) {
+        // Manutenção/Operação: PENDENTE, APROVADA, RECUSADA, PLANEJADA, EM_ANALISE
+        return ([
+          OrderStatus.PENDENTE,
+          OrderStatus.APROVADA,
+          OrderStatus.RECUSADA,
+          OrderStatus.PLANEJADA,
+          OrderStatus.EM_ANALISE
+        ] as OrderStatus[]).includes(existingOs.status);
       }
-    }
-    // OUTROS CARGOS (Tripulação, Assistentes, Auxiliares, Estagiários):
-    else if (
-      [
-        UserRole.COMANDANTE,
-        UserRole.IMEDIATO,
-        UserRole.OQN,
-        UserRole.CHEFE_MAQUINAS,
-        UserRole.SUB_CHEFE_MAQUINAS,
-        UserRole.OQM,
-        UserRole.ASSISTENTE,
-        UserRole.AUXILIAR,
-        UserRole.ESTAGIARIO,
-      ].includes(userRole as any)
-    ) {
-      // ✅ Adicionado 'as any'
-      const allowedOtherStatuses: OrderStatus[] = [
-        OrderStatus.PENDENTE, // Apenas PENDENTE para criadores ou tripulação inicial
-      ];
-      // Podem editar se forem o CRIADOR da OS E a OS estiver em status PENDENTE
-      if (
-        session.user?.id === existingOs.createdById &&
-        allowedOtherStatuses.includes(existingOs.status as OrderStatus)
-      ) {
-        canEdit = true;
+      if (userSector === UserSector.SUPRIMENTOS) {
+        // Suprimentos: AGUARDANDO_SUPRIMENTOS, CONTRATADA
+        return ([OrderStatus.AGUARDANDO_SUPRIMENTOS, OrderStatus.CONTRATADA] as OrderStatus[]).includes(existingOs.status);
       }
-    }
-    // Setores como RH, TI, Almoxarifado, Nao_Definido não devem editar por padrão, a menos que especificado.
-    // Apenas Administracao para o ADMIN.
+      // Outros setores não podem editar
+      return false;
+    })();
 
     if (!canEdit) {
       return new NextResponse(

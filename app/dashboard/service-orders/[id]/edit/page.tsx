@@ -315,7 +315,7 @@ export default function EditServiceOrderPage() {
       router.push(`/dashboard/service-orders/${id}`);
     } catch (err) {
       console.error("Erro ao atualizar OS:", err);
-      toast.error("Erro de rede ao atualizar Ordem de Serviço.");
+      toast.error("Você não esta autorizado a editar OS com este Status");
     }
   };
 
