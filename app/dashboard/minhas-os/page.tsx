@@ -41,7 +41,7 @@ export default async function MinhasOSPage({ searchParams }: any) {
 
   // Lógica para Admin e outros usuários (mantida do código anterior, sem historico por enquanto)
   if (userRole === UserRole.ADMIN) {
-    whereClause._status = {
+    whereClause.status = {
       notIn: [OrderStatus.CONCLUIDA, OrderStatus.CANCELADA],
     };
   } 
