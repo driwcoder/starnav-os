@@ -22,13 +22,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SearchIcon, XIcon } from "lucide-react";
-import { OrderStatus, Priority } from "@prisma/client";
+import { Plus, SearchIcon, XIcon } from "lucide-react";
+import { UserSector, OrderStatus, SolutionType, Priority } from "@prisma/client";
+import { toast } from "sonner";
+// Update the import path if the file exists elsewhere, for example:
+import { OrderActions } from "./components/OrderActions";
+// Or, if the file does not exist, create it at app/components/OrderActions.tsx
 
 // Interface para os parâmetros de busca e filtro da URL
 // Usamos 'any' aqui para contornar o bug de inferência do compilador do Next.js
 interface ServiceOrdersPageProps {
   searchParams: any; // Mantenha como 'any' para evitar erros de tipagem persistentes
+}
+
+function canEditOrder({
+  userSector,
+  status,
+  solutionType,
+}: {
+  userSector: UserSector;
+  status: OrderStatus;
+  solutionType?: SolutionType | null;
+}) {
+  if (userSector === UserSector.TRIPULACAO) {
+    if (["PENDENTE", "RECUSADA"].includes(status)) return true;
+    if (status === "EM_EXECUCAO" && solutionType === "INTERNA") return true;
+    return false;
+  }
+  if ([UserSector.MANUTENCAO, UserSector.OPERACAO].includes(userSector as any)) {
+    return ["PENDENTE", "APROVADA", "RECUSADA", "PLANEJADA", "EM_ANALISE"].includes(status);
+  }
+  if (userSector === UserSector.SUPRIMENTOS) {
+    return ["AGUARDANDO_SUPRIMENTOS", "CONTRATADA"].includes(status);
+  }
+  return false;
 }
 
 export default async function ServiceOrdersPage({ searchParams }: ServiceOrdersPageProps) {
@@ -37,6 +64,8 @@ export default async function ServiceOrdersPage({ searchParams }: ServiceOrdersP
   if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
     redirect("/login");
   }
+
+  const userSector = session?.user?.sector; // obtenha do session
 
   // ✅ CORREÇÃO: Await searchParams antes de acessar suas propriedades
   const actualSearchParams = await searchParams;
@@ -89,7 +118,7 @@ export default async function ServiceOrdersPage({ searchParams }: ServiceOrdersP
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-3xl font-bold text-gray-800">Ordens de Serviço</h2>
         <Link href="/dashboard/service-orders/new">
-          <Button>Criar Nova OS</Button>
+          <Button><Plus /> Nova OS</Button>
         </Link>
       </div>
 
@@ -111,8 +140,8 @@ export default async function ServiceOrdersPage({ searchParams }: ServiceOrdersP
             )}
           </div>
 
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
+          <div className="flex flex-col md:flex-row gap-4 ">
+            <div className="">
               <Select name="status" defaultValue={statusFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filtrar por Status" />
@@ -128,7 +157,7 @@ export default async function ServiceOrdersPage({ searchParams }: ServiceOrdersP
               </Select>
             </div>
 
-            <div className="flex-1">
+            <div className="flex-2">
               <Select name="priority" defaultValue={priorityFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filtrar por Prioridade" />
@@ -190,12 +219,12 @@ export default async function ServiceOrdersPage({ searchParams }: ServiceOrdersP
                   <TableCell>{order.createdBy?.name || order.createdBy?.email}</TableCell>
                   <TableCell>{order.dueDate ? formatDate(order.dueDate) : "N/A"}</TableCell>
                   <TableCell className="text-right space-x-2">
-                    <Link href={`/dashboard/service-orders/${order.id}`}>
-                      <Button variant="outline" size="sm">Ver</Button>
-                    </Link>
-                    <Link href={`/dashboard/service-orders/${order.id}/edit`}>
-                      <Button variant="outline" size="sm">Editar</Button>
-                    </Link>
+                    <OrderActions
+                      userSector={userSector}
+                      status={order.status}
+                      solutionType={order.solutionType}
+                      orderId={order.id}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
