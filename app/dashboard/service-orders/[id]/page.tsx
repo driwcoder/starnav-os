@@ -27,7 +27,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { UserRole, UserSector } from "@prisma/client";
+import { UserRole, UserSector, OrderStatus, SolutionType } from "@prisma/client";
 
 export default function ServiceOrderDetailsPage() {
   const router = useRouter();
@@ -150,6 +150,29 @@ export default function ServiceOrderDetailsPage() {
       toast.error("Erro de rede ao excluir Ordem de Serviço.");
     }
   };
+
+  function canEditOrder({
+    userSector,
+    status,
+    solutionType,
+  }: {
+    userSector: UserSector;
+    status: OrderStatus;
+    solutionType?: SolutionType | null;
+  }) {
+    if (userSector === UserSector.TRIPULACAO) {
+      if (["PENDENTE", "RECUSADA"].includes(status)) return true;
+      if (status === "EM_EXECUCAO" && solutionType === "INTERNA") return true;
+      return false;
+    }
+    if ([UserSector.MANUTENCAO, UserSector.OPERACAO].includes(userSector as any)) {
+      return ["PENDENTE", "APROVADA", "RECUSADA", "PLANEJADA", "EM_ANALISE"].includes(status);
+    }
+    if (userSector === UserSector.SUPRIMENTOS) {
+      return ["AGUARDANDO_SUPRIMENTOS", "CONTRATADA"].includes(status);
+    }
+    return false;
+  }
 
   if (status === "loading") {
     return (
@@ -429,8 +452,40 @@ export default function ServiceOrderDetailsPage() {
 
           {/* Botões de Ação */}
           <div className="flex justify-end gap-2 mt-8">
-            <Link href={`/dashboard/service-orders/${serviceOrder.id}/edit`}>
-              <Button>Editar OS</Button>
+            <Link
+              href={
+                canEditOrder({
+                  userSector: session?.user?.sector ?? UserSector.NAO_DEFINIDO,
+                  status: serviceOrder.status,
+                  solutionType: serviceOrder.solutionType,
+                })
+                  ? `/dashboard/service-orders/${serviceOrder.id}/edit`
+                  : "#"
+              }
+              onClick={(e) => {
+                if (
+                  !canEditOrder({
+                    userSector: session?.user?.sector ?? UserSector.NAO_DEFINIDO,
+                    status: serviceOrder.status,
+                    solutionType: serviceOrder.solutionType,
+                  })
+                ) {
+                  e.preventDefault();
+                  toast.error("Você não tem permissão para editar esta Ordem de Serviço.");
+                }
+              }}
+            >
+              <Button
+                disabled={
+                  !canEditOrder({
+                    userSector: session?.user?.sector ?? UserSector.NAO_DEFINIDO,
+                    status: serviceOrder.status,
+                    solutionType: serviceOrder.solutionType,
+                  })
+                }
+              >
+                Editar OS
+              </Button>
             </Link>
             <AlertDialog>
               {session?.user.sector === "SUPRIMENTOS" && (
