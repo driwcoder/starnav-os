@@ -27,7 +27,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { UserRole, UserSector, OrderStatus, SolutionType } from "@prisma/client";
+import {
+  UserRole,
+  UserSector,
+  OrderStatus,
+  SolutionType,
+} from "@prisma/client";
 
 export default function ServiceOrderDetailsPage() {
   const router = useRouter();
@@ -165,8 +170,16 @@ export default function ServiceOrderDetailsPage() {
       if (status === "EM_EXECUCAO" && solutionType === "INTERNA") return true;
       return false;
     }
-    if ([UserSector.MANUTENCAO, UserSector.OPERACAO].includes(userSector as any)) {
-      return ["PENDENTE", "APROVADA", "RECUSADA", "PLANEJADA", "EM_ANALISE"].includes(status);
+    if (
+      [UserSector.MANUTENCAO, UserSector.OPERACAO].includes(userSector as any)
+    ) {
+      return [
+        "PENDENTE",
+        "APROVADA",
+        "RECUSADA",
+        "PLANEJADA",
+        "EM_ANALISE",
+      ].includes(status);
     }
     if (userSector === UserSector.SUPRIMENTOS) {
       return ["AGUARDANDO_SUPRIMENTOS", "CONTRATADA"].includes(status);
@@ -419,9 +432,6 @@ export default function ServiceOrderDetailsPage() {
             </h3>
             {serviceOrder.reportAttachments?.length > 0 ? (
               <div className="mt-6">
-                <h3 className="font-semibold text-lg text-gray-800 mb-2">
-                  Relatórios Anexados
-                </h3>
                 <ul className="space-y-2">
                   {serviceOrder.reportAttachments.map(
                     (
@@ -465,20 +475,24 @@ export default function ServiceOrderDetailsPage() {
               onClick={(e) => {
                 if (
                   !canEditOrder({
-                    userSector: session?.user?.sector ?? UserSector.NAO_DEFINIDO,
+                    userSector:
+                      session?.user?.sector ?? UserSector.NAO_DEFINIDO,
                     status: serviceOrder.status,
                     solutionType: serviceOrder.solutionType,
                   })
                 ) {
                   e.preventDefault();
-                  toast.error("Você não tem permissão para editar esta Ordem de Serviço.");
+                  toast.error(
+                    "Você não tem permissão para editar esta Ordem de Serviço."
+                  );
                 }
               }}
             >
               <Button
                 disabled={
                   !canEditOrder({
-                    userSector: session?.user?.sector ?? UserSector.NAO_DEFINIDO,
+                    userSector:
+                      session?.user?.sector ?? UserSector.NAO_DEFINIDO,
                     status: serviceOrder.status,
                     solutionType: serviceOrder.solutionType,
                   })

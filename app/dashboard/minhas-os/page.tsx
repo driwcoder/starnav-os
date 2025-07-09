@@ -19,8 +19,7 @@ function canEditOrder({
   solutionType?: SolutionType | null;
 }) {
   if (userSector === UserSector.TRIPULACAO) {
-    if (["PENDENTE", "RECUSADA"].includes(status)) return true;
-    if (status === "EM_EXECUCAO" && solutionType === "INTERNA") return true;
+    if (["PENDENTE", "RECUSADA", "EM_EXECUCAO"].includes(status)) return true;
     return false;
   }
   if (

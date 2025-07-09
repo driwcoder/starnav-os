@@ -1,3 +1,5 @@
 - adicionar cancelamento de OS apenas pelas ROLES coordenador, supervisor pra cima.
 - log de eventos por usuário ou nas OSs e PWTs
 - ajeitar fluxo para apenas alguns cargos conseguirem fazer tais ações
+- criar um arquivo de rotina
+  - resetar filtros dos usuarios para os status que eles podem editar.
