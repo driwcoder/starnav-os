@@ -15,7 +15,7 @@ const statusIcons: Record<OrderStatus, JSX.Element> = {
   AGUARDANDO_SUPRIMENTOS: <Clock className="h-6 w-6 text-orange-500" />,
   CONTRATADA: <Clock className="h-6 w-6 text-violet-500" />,
   EM_EXECUCAO: <Loader className="h-6 w-6 text-blue-600 animate-spin" />,
-  AGUARDANDO_PECAS: <Clock className="h-6 w-6 text-pink-500" />,
+  AGUARDANDO_MATERIAL: <Clock className="h-6 w-6 text-pink-500" />,
   CONCLUIDA: <BadgeCheck className="h-6 w-6 text-green-600" />,
   CANCELADA: <XCircle className="h-6 w-6 text-gray-500" />,
 };

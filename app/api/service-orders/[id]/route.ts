@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import * as z from "zod";
-import { OrderStatus, Priority, UserRole, UserSector, SolutionType } from "@prisma/client";
+import { OrderStatus, SolutionType } from "@prisma/client";
 import { hasViewPermission, canEditOs, canDeleteOs, isValidStatusTransition } from "@/lib/permissions";
 
 // Schema de validação para o ID (comum para GET e PUT)
@@ -20,7 +20,7 @@ const updateServiceOrderSchema = z.object({
   priority: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"]).optional(),
   assignedToId: z.string().uuid("ID do responsável inválido.").optional().nullable(),
   dueDate: z.string().datetime().optional().nullable(),
-  status: z.enum(["PENDENTE", "EM_ANALISE", "APROVADA", "RECUSADA", "EM_EXECUCAO", "AGUARDANDO_PECAS", "CONCLUIDA", "CANCELADA", "PLANEJADA", "AGUARDANDO_SUPRIMENTOS", "CONTRATADA"]).optional(),
+  status: z.enum(["PENDENTE", "EM_ANALISE", "APROVADA", "RECUSADA", "EM_EXECUCAO", "AGUARDANDO_MATERIAL", "CONCLUIDA", "CANCELADA", "PLANEJADA", "AGUARDANDO_SUPRIMENTOS", "CONTRATADA"]).optional(),
   completedAt: z.string().datetime().optional().nullable(),
   plannedStartDate: z.string().datetime().optional().nullable(),
   plannedEndDate: z.string().datetime().optional().nullable(),

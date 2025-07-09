@@ -19,7 +19,7 @@ const ALL_STATUSES: OrderStatus[] = [
   OrderStatus.AGUARDANDO_SUPRIMENTOS,
   OrderStatus.CONTRATADA,
   OrderStatus.EM_EXECUCAO,
-  OrderStatus.AGUARDANDO_PECAS,
+  OrderStatus.AGUARDANDO_MATERIAL,
   OrderStatus.CONCLUIDA,
   OrderStatus.CANCELADA,
 ];

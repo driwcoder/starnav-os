@@ -89,10 +89,10 @@ const VALID_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
     [OrderStatus.EM_ANALISE]: [OrderStatus.APROVADA, OrderStatus.RECUSADA, OrderStatus.PLANEJADA],
     [OrderStatus.APROVADA]: [OrderStatus.PLANEJADA, OrderStatus.EM_EXECUCAO],
     [OrderStatus.PLANEJADA]: [OrderStatus.AGUARDANDO_SUPRIMENTOS, OrderStatus.EM_EXECUCAO],
-    [OrderStatus.AGUARDANDO_SUPRIMENTOS]: [OrderStatus.CONTRATADA, OrderStatus.AGUARDANDO_PECAS, OrderStatus.CANCELADA],
+    [OrderStatus.AGUARDANDO_SUPRIMENTOS]: [OrderStatus.CONTRATADA, OrderStatus.AGUARDANDO_MATERIAL, OrderStatus.CANCELADA],
     [OrderStatus.CONTRATADA]: [OrderStatus.EM_EXECUCAO, OrderStatus.CANCELADA],
-    [OrderStatus.EM_EXECUCAO]: [OrderStatus.CONCLUIDA, OrderStatus.AGUARDANDO_PECAS, OrderStatus.CANCELADA],
-    [OrderStatus.AGUARDANDO_PECAS]: [OrderStatus.EM_EXECUCAO, OrderStatus.CANCELADA],
+    [OrderStatus.EM_EXECUCAO]: [OrderStatus.CONCLUIDA, OrderStatus.AGUARDANDO_MATERIAL, OrderStatus.CANCELADA],
+    [OrderStatus.AGUARDANDO_MATERIAL]: [OrderStatus.EM_EXECUCAO, OrderStatus.CANCELADA],
     [OrderStatus.CONCLUIDA]: [OrderStatus.APROVADA, OrderStatus.CANCELADA],
     [OrderStatus.CANCELADA]: [OrderStatus.PENDENTE],
     [OrderStatus.RECUSADA]: [OrderStatus.PENDENTE],
@@ -120,7 +120,7 @@ export const isValidStatusTransition = (
         case UserSector.TRIPULACAO:
             // Tripulação pode fazer transições do seu fluxo
             if (currentStatus === OrderStatus.PENDENTE && newStatus === OrderStatus.EM_ANALISE) return true;
-            if (currentStatus === OrderStatus.EM_EXECUCAO && (newStatus === OrderStatus.CONCLUIDA || newStatus === OrderStatus.AGUARDANDO_PECAS)) return true;
+            if (currentStatus === OrderStatus.EM_EXECUCAO && (newStatus === OrderStatus.CONCLUIDA || newStatus === OrderStatus.AGUARDANDO_MATERIAL)) return true;
             if (currentStatus === OrderStatus.RECUSADA && newStatus === OrderStatus.PENDENTE) return true;
             return false;
         case UserSector.MANUTENCAO:
@@ -129,7 +129,7 @@ export const isValidStatusTransition = (
             return allowedNextStatuses.includes(newStatus);
         case UserSector.SUPRIMENTOS:
             // Compradores: Podem fazer transições do seu fluxo de compras
-            if (currentStatus === OrderStatus.AGUARDANDO_SUPRIMENTOS && (newStatus === OrderStatus.CONTRATADA || newStatus === OrderStatus.CANCELADA || newStatus === OrderStatus.AGUARDANDO_PECAS)) return true;
+            if (currentStatus === OrderStatus.AGUARDANDO_SUPRIMENTOS && (newStatus === OrderStatus.CONTRATADA || newStatus === OrderStatus.CANCELADA || newStatus === OrderStatus.AGUARDANDO_MATERIAL)) return true;
             if (currentStatus === OrderStatus.CONTRATADA && (newStatus === OrderStatus.EM_EXECUCAO || newStatus === OrderStatus.CANCELADA)) return true;
             return false;
         default:

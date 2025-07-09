@@ -65,7 +65,7 @@ const formSchema = z.object({
       "APROVADA",
       "RECUSADA",
       "EM_EXECUCAO",
-      "AGUARDANDO_PECAS",
+      "AGUARDANDO_MATERIAL",
       "CONCLUIDA",
       "CANCELADA",
       "PLANEJADA",
@@ -97,7 +97,6 @@ export default function EditServiceOrderPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-    const [serviceOrder, setServiceOrder] = useState<any>(null);
   const inputFileRef = useRef<HTMLInputElement>(null);
   const [blob, setBlob] = useState<any>(null);
 
@@ -368,7 +367,7 @@ export default function EditServiceOrderPage() {
       ],
       [OrderStatus.AGUARDANDO_SUPRIMENTOS]: [
         OrderStatus.CONTRATADA,
-        OrderStatus.AGUARDANDO_PECAS,
+        OrderStatus.AGUARDANDO_MATERIAL,
         OrderStatus.CANCELADA,
       ],
       [OrderStatus.CONTRATADA]: [
@@ -377,10 +376,10 @@ export default function EditServiceOrderPage() {
       ],
       [OrderStatus.EM_EXECUCAO]: [
         OrderStatus.CONCLUIDA,
-        OrderStatus.AGUARDANDO_PECAS,
+        OrderStatus.AGUARDANDO_MATERIAL,
         OrderStatus.CANCELADA,
       ],
-      [OrderStatus.AGUARDANDO_PECAS]: [
+      [OrderStatus.AGUARDANDO_MATERIAL]: [
         OrderStatus.EM_EXECUCAO,
         OrderStatus.CANCELADA,
       ],
@@ -397,7 +396,7 @@ export default function EditServiceOrderPage() {
         const allowedTripulacaoStatus: OrderStatus[] = [
           OrderStatus.EM_ANALISE,
           OrderStatus.CONCLUIDA,
-          OrderStatus.AGUARDANDO_PECAS,
+          OrderStatus.AGUARDANDO_MATERIAL,
           OrderStatus.PENDENTE,
           OrderStatus.RECUSADA,
           OrderStatus.EM_EXECUCAO,
@@ -413,7 +412,7 @@ export default function EditServiceOrderPage() {
           OrderStatus.PLANEJADA,
           OrderStatus.AGUARDANDO_SUPRIMENTOS,
           OrderStatus.EM_EXECUCAO,
-          OrderStatus.AGUARDANDO_PECAS,
+          OrderStatus.AGUARDANDO_MATERIAL,
           OrderStatus.CONCLUIDA,
           OrderStatus.CANCELADA,
           OrderStatus.PENDENTE,
@@ -426,7 +425,7 @@ export default function EditServiceOrderPage() {
         const allowedSuprimentosStatus: OrderStatus[] = [
           OrderStatus.CONTRATADA,
           OrderStatus.EM_EXECUCAO,
-          OrderStatus.AGUARDANDO_PECAS,
+          OrderStatus.AGUARDANDO_MATERIAL,
           OrderStatus.CANCELADA,
           OrderStatus.AGUARDANDO_SUPRIMENTOS, // Incluir AGUARDANDO_SUPRIMENTOS se eles precisam ver/interagir com ele
         ];

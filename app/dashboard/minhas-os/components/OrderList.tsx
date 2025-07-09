@@ -10,7 +10,7 @@ import {
   SolutionType,
   UserSector,
 } from "@prisma/client";
-import { Pencil, Eye, MoreVertical } from "lucide-react";
+import { Pencil, Eye, MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,7 +66,7 @@ export default async function OrderList({
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
                   <span className="sr-only">Abrir menu</span>
-                  <MoreVertical className="h-4 w-4" />
+                  <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">

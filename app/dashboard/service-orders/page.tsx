@@ -29,42 +29,10 @@ import {
   SolutionType,
   Priority,
 } from "@prisma/client";
-import { toast } from "sonner";
 import { OrderActions } from "./components/OrderActions";
 
 interface ServiceOrdersPageProps {
   searchParams: any;
-}
-
-function canEditOrder({
-  userSector,
-  status,
-  solutionType,
-}: {
-  userSector: UserSector;
-  status: OrderStatus;
-  solutionType?: SolutionType | null;
-}) {
-  if (userSector === UserSector.TRIPULACAO) {
-    if (["PENDENTE", "RECUSADA"].includes(status)) return true;
-    if (status === "EM_EXECUCAO" && solutionType === "INTERNA") return true;
-    return false;
-  }
-  if (
-    [UserSector.MANUTENCAO, UserSector.OPERACAO].includes(userSector as any)
-  ) {
-    return [
-      "PENDENTE",
-      "APROVADA",
-      "RECUSADA",
-      "PLANEJADA",
-      "EM_ANALISE",
-    ].includes(status);
-  }
-  if (userSector === UserSector.SUPRIMENTOS) {
-    return ["AGUARDANDO_SUPRIMENTOS", "CONTRATADA"].includes(status);
-  }
-  return false;
 }
 
 export default async function ServiceOrdersPage({
