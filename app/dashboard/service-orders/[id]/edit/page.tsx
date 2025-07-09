@@ -1,7 +1,7 @@
 // app/dashboard/service-orders/[id]/edit/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
@@ -27,7 +27,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
-import { ArrowLeftIcon, FrownIcon } from "lucide-react";
+import { ArrowLeftIcon, FrownIcon, PaperclipIcon } from "lucide-react";
 import {
   OrderStatus,
   Priority,
@@ -36,6 +36,8 @@ import {
   SolutionType,
 } from "@prisma/client";
 import { canEditOs, isValidStatusTransition } from "@/lib/permissions";
+import { ConfirmDeleteAttachment } from "@/components/confirm-delete-attachment";
+import { PutBlobResult } from "@vercel/blob";
 
 // --- Definição do Schema de Validação com Zod ---
 const formSchema = z.object({
@@ -83,6 +85,7 @@ const formSchema = z.object({
   contractDate: z.string().optional().nullable(),
   serviceOrderCost: z.number().min(0).optional().nullable(),
   supplierNotes: z.string().optional().nullable(),
+  reportAttachments: z.array(z.string().url()),
 });
 
 // --- Componente da Página ---
@@ -94,6 +97,10 @@ export default function EditServiceOrderPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+    const [serviceOrder, setServiceOrder] = useState<any>(null);
+  const inputFileRef = useRef<HTMLInputElement>(null);
+  const [blob, setBlob] = useState<any>(null);
+
   const [currentOsStatus, setCurrentOsStatus] = useState<OrderStatus | null>(
     null
   );
@@ -120,6 +127,8 @@ export default function EditServiceOrderPage() {
       contractDate: null,
       serviceOrderCost: null,
       supplierNotes: null,
+            reportAttachments: [],
+
     },
   });
 
@@ -191,6 +200,7 @@ export default function EditServiceOrderPage() {
               ? parseFloat(data.serviceOrderCost)
               : null,
           supplierNotes: data.supplierNotes || null,
+          reportAttachments: Array.isArray(data.reportAttachments) ? data.reportAttachments : [],
         });
       } catch (err: any) {
         setError(
@@ -591,7 +601,7 @@ export default function EditServiceOrderPage() {
 
                   {/* ✅ MODIFICADO: Filtra os status para não duplicar o atual */}
                   {availableStatusOptions
-                    .filter(statusValue => statusValue !== currentOsStatus)
+                    .filter((statusValue) => statusValue !== currentOsStatus)
                     .map((statusValue) => (
                       <SelectItem key={statusValue} value={statusValue}>
                         {statusValue.replace(/_/g, " ")}
@@ -739,12 +749,16 @@ export default function EditServiceOrderPage() {
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="serviceOrderCost">Custo do Serviço (R$)</Label>
+                  <Label htmlFor="serviceOrderCost">
+                    Custo do Serviço (R$)
+                  </Label>
                   <Input
                     id="serviceOrderCost"
                     type="number"
                     step="0.01"
-                    {...form.register("serviceOrderCost", { valueAsNumber: true })}
+                    {...form.register("serviceOrderCost", {
+                      valueAsNumber: true,
+                    })}
                     placeholder="Ex: 3500.00"
                   />
                   {form.formState.errors.serviceOrderCost && (
@@ -771,6 +785,132 @@ export default function EditServiceOrderPage() {
                 </div>
               </>
             )}
+            
+            {/* Upload de Relatório/Anexo */}
+            {/* Upload de Relatório/Anexo */}
+            <div className="space-y-2">
+              <Label className="font-semibold">Anexar Relatório</Label>
+              <div className="flex items-center gap-4">
+                <input
+                  name="file"
+                  ref={inputFileRef}
+                  type="file"
+                  accept="image/jpeg, image/png, image/webp,application/pdf"
+                  className="block w-full text-sm text-gray-700 border border-gray-300 rounded-md cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  onClick={async () => {
+                    if (!inputFileRef.current?.files?.length) {
+                      toast.error("Selecione um arquivo para anexar.");
+                      return;
+                    }
+                    const file = inputFileRef.current.files[0];
+                    try {
+                      const response = await fetch(
+                        `/api/blob/upload?filename=${file.name}`,
+                        {
+                          method: "POST",
+                          body: file,
+                        }
+                      );
+                      if (!response.ok) {
+                        toast.error("Falha ao fazer upload do arquivo.");
+                        return;
+                      }
+                      const newBlob = (await response.json()) as PutBlobResult;
+                      setBlob(newBlob);
+                      form.setValue("reportAttachments", [
+                        ...(form.getValues("reportAttachments") || []),
+                        newBlob.url,
+                      ]);
+                      toast.success("Arquivo anexado com sucesso!");
+                      if (inputFileRef.current) inputFileRef.current.value = "";
+                    } catch (err) {
+                      toast.error("Erro ao anexar arquivo.");
+                    }
+                  }}
+                >
+                  <PaperclipIcon className="h-5 w-5" />
+                  Anexar
+                </Button>
+              </div>
+              {blob && (
+                <div className="text-xs text-gray-500">
+                  Último anexo:{" "}
+                  <a
+                    href={blob.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 underline"
+                  >
+                    {blob.url}
+                  </a>
+                </div>
+              )}
+
+              {/* Lista de anexos já existentes */}
+              <div className="mt-6">
+                <h3 className="font-semibold text-lg text-gray-800 mb-2">
+                  Anexos da Ordem de Serviço
+                </h3>
+                {form.watch("reportAttachments")?.length > 0 ? (
+                  <ul className="space-y-2">
+                    {form.watch("reportAttachments").map((url, index) => (
+                      <li
+                        key={index}
+                        className="flex justify-between items-center bg-gray-100 px-3 py-2 rounded"
+                      >
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 underline break-all"
+                        >
+                          {url.split("/").pop()}
+                        </a>
+                        <ConfirmDeleteAttachment
+                          fileUrl={url}
+                          onConfirm={async () => {
+                            try {
+                              const res = await fetch(`/api/blob/delete`, {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({ url }),
+                              });
+
+                              if (!res.ok) {
+                                throw new Error("Erro ao excluir o arquivo.");
+                              }
+
+                              const updated =
+                                form
+                                  .getValues("reportAttachments")
+                                  ?.filter((_, i) => i !== index) || [];
+                              form.setValue("reportAttachments", updated);
+                            } catch (error) {
+                              toast.error("Erro ao excluir o anexo.");
+                            }
+                          }}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-500">Nenhum anexo cadastrado.</p>
+                )}
+                {form.formState.errors.reportAttachments && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {form.formState.errors.reportAttachments.message}
+                  </p>
+                )}
+              </div>
+            </div>
+            {/* Fim do Upload de Relatório/Anexo */}
 
             {/* Botões de Ação */}
             <div className="flex gap-4 col-span-full mt-6">

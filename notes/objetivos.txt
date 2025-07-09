@@ -1,0 +1,135 @@
+Fases do Projeto StarNav OS
+Fase 1: Configuração Inicial e Autenticação Básica
+
+Criação do projeto Next.js, TypeScript e Tailwind CSS.
+
+Configuração do NextAuth.js para login e logout.
+
+Integração inicial com Prisma e Neon (PostgreSQL).
+
+Configuração do shadcn/ui.
+
+Status: Concluída.
+
+Fase 2: Autenticação com Banco de Dados e Cadastro de Usuário
+
+Integração do NextAuth.js com o Prisma para usuários no DB.
+
+Implementação da criptografia de senhas com bcryptjs.
+
+Criação de API e página de registro de usuários.
+
+Status: Concluída.
+
+Fase 3: Estrutura do Dashboard e Navegação
+
+Criação do layout principal (Header, Sidebar).
+
+Proteção de rotas com middleware para acesso apenas de usuários logados e autorizados.
+
+Status: Concluída.
+
+Fase 4: Gestão de Ordens de Serviço (CRUD Completo)
+
+Implementação do CRUD (Criar, Visualizar, Editar, Excluir) para Ordens de Serviço.
+
+Adição de busca e filtragem para a lista de OSs.
+
+Status: Concluída.
+
+Fase 5: Gerenciamento de Usuários (CRUD Completo com Cargos e Setores)
+
+Implementação do CRUD (Criar, Visualizar, Editar, Excluir) para Usuários.
+
+Adição de busca e filtragem para a lista de Usuários.
+
+Separação de UserRole (cargo) e UserSector (setor) no schema e em todo o sistema.
+
+Implementação de redefinição de senha por admin.
+
+Implementação de alteração de senha pelo próprio usuário.
+
+Status: Concluída.
+
+Fase 6: Planejamento e Atendimento de Ordens de Serviço (Fluxo Detalhado)
+
+Atualização do schema.prisma com todos os novos campos para planejamento, suprimentos e anexos (Ex: scopeOfService, plannedStartDate, contractedCompany, reportAttachments).
+
+Ajuste da página de criação de OS para incluir o scopeOfService.
+
+Ajuste da página de detalhes de OS para exibir todos os novos campos.
+
+Ajuste da página de edição de OS para permitir a edição de todos os novos campos de planejamento e suprimentos.
+
+Refinamento rigoroso das permissões de edição de OS com base no cargo, setor e status da Ordem de Serviço.
+
+Status: Estamos ATUALMENTE AQUI. Estamos trabalhando para resolver os últimos erros de tipagem nas permissões de edição de OS, que são a etapa final desse refinamento antes de considerarmos a edição totalmente pronta.
+
+Fase 6: Planejamento e Atendimento de Ordens de Serviço (Conclusão)
+Esta é a fase em que estamos atualmente, focando em detalhar e otimizar o fluxo de trabalho das OSs entre manutenção e suprimentos.
+
+Implementação dos Novos Campos de Planejamento e Suprimentos:
+
+Integrar e habilitar a edição de todos os novos campos no formulário de edição de OS (plannedStartDate, plannedEndDate, solutionType, responsibleCrew, coordinatorNotes, contractedCompany, contractDate, serviceOrderCost, supplierNotes).
+
+Garantir que a API de edição de OS processe corretamente todos esses dados.
+
+Implementação da Lógica de Anexo de Relatórios:
+
+Configurar um serviço de armazenamento de arquivos (como Vercel Blob).
+
+Desenvolver a funcionalidade para anexar arquivos de relatório às Ordens de Serviço (na página de edição de OS ou em uma nova seção de relatórios).
+
+Exibir os anexos como links na página de detalhes da OS.
+
+Status: Estamos trabalhando ativamente no refinamento final das permissões de edição de OS. Assim que isso estiver 100% (o que estamos bem perto!), concluiremos esta sub-fase, e a Fase 6 estará pronta para o commit.
+
+Fase 7: Fluxos e Dashboards Orientados a Papéis
+Esta fase se concentrará em tornar o sistema mais intuitivo e poderoso para cada tipo de usuário, com visualizações personalizadas e automação de status.
+
+Refinamento do Fluxo de Status de OS:
+
+Desenvolver a lógica para transições automáticas de status ou alertas quando uma OS muda de responsabilidade (ex: de PLANEJADA para AGUARDANDO_SUPRIMENTOS).
+
+(Opcional): Implementar validação de transição de status para impedir que um usuário mude a OS para um status inválido (ex: de AGUARDANDO_SUPRIMENTOS para CONCLUIDA sem passar por CONTRATADA).
+
+Dashboards Personalizados por Papel/Setor:
+
+Criar um Dashboard para Coordenadores de Manutenção/Operação (MANUTENCAO, OPERACAO) exibindo OSs que exigem planejamento ou acompanhamento (ex: PENDENTE, EM_ANALISE, PLANEJADA, EM_EXECUCAO).
+
+Criar um Dashboard para Compradores (SUPRIMENTOS) exibindo OSs com status AGUARDANDO_SUPRIMENTOS ou CONTRATADA.
+
+Criar um Dashboard para Tripulação (TRIPULACAO) exibindo OSs que eles criaram ou que são designadas a eles.
+
+Notificações Internas: Implementar um sistema básico de notificações (dentro do app ou via email) para alertar os responsáveis sobre mudanças críticas no status da OS (ex: "OS mudou para AGUARDANDO SUPRIMENTOS").
+
+Fase 8: Otimizações e Ferramentas Auxiliares
+Esta fase trará recursos adicionais para aumentar a eficiência e o controle.
+
+Pedidos de Materiais:
+
+Desenvolver um módulo separado para Pedidos de Materiais com seu próprio CRUD (incluindo campos como item, quantidade, fornecedor preferencial, status de compra).
+
+Integrar pedidos de materiais às Ordens de Serviço (uma OS pode gerar um ou mais pedidos de material).
+
+Gerenciamento de Navios/Frota:
+
+Criar um módulo para cadastrar e gerenciar os navios da frota, associando coordenadores responsáveis a navios específicos.
+
+Relatórios e Análises:
+
+Gerar relatórios básicos sobre o tempo de vida das OSs, custos, performance de atendimento, etc.
+
+Histórico de Atividade (Log de Auditoria):
+
+Implementar um sistema para registrar alterações importantes em uma OS (quem alterou, o quê e quando).
+
+Otimizações de Performance:
+
+Implementar paginação e carregamento infinito (lazy loading) para grandes listas.
+
+Otimizar consultas do Prisma.
+
+Deploy e Ambiente de Produção:
+
+Preparar o projeto para o deploy final na Vercel, configurando o ambiente de produção.
