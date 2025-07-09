@@ -23,16 +23,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, SearchIcon, XIcon } from "lucide-react";
-import { UserSector, OrderStatus, SolutionType, Priority } from "@prisma/client";
+import {
+  UserSector,
+  OrderStatus,
+  SolutionType,
+  Priority,
+} from "@prisma/client";
 import { toast } from "sonner";
-// Update the import path if the file exists elsewhere, for example:
 import { OrderActions } from "./components/OrderActions";
-// Or, if the file does not exist, create it at app/components/OrderActions.tsx
 
-// Interface para os parâmetros de busca e filtro da URL
-// Usamos 'any' aqui para contornar o bug de inferência do compilador do Next.js
 interface ServiceOrdersPageProps {
-  searchParams: any; // Mantenha como 'any' para evitar erros de tipagem persistentes
+  searchParams: any;
 }
 
 function canEditOrder({
@@ -49,8 +50,16 @@ function canEditOrder({
     if (status === "EM_EXECUCAO" && solutionType === "INTERNA") return true;
     return false;
   }
-  if ([UserSector.MANUTENCAO, UserSector.OPERACAO].includes(userSector as any)) {
-    return ["PENDENTE", "APROVADA", "RECUSADA", "PLANEJADA", "EM_ANALISE"].includes(status);
+  if (
+    [UserSector.MANUTENCAO, UserSector.OPERACAO].includes(userSector as any)
+  ) {
+    return [
+      "PENDENTE",
+      "APROVADA",
+      "RECUSADA",
+      "PLANEJADA",
+      "EM_ANALISE",
+    ].includes(status);
   }
   if (userSector === UserSector.SUPRIMENTOS) {
     return ["AGUARDANDO_SUPRIMENTOS", "CONTRATADA"].includes(status);
@@ -58,23 +67,23 @@ function canEditOrder({
   return false;
 }
 
-export default async function ServiceOrdersPage({ searchParams }: ServiceOrdersPageProps) {
+export default async function ServiceOrdersPage({
+  searchParams,
+}: ServiceOrdersPageProps) {
   const session = await getServerSession(authOptions);
 
-  if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br")) {
+  if (
+    !session ||
+    !(session.user?.email as string)?.endsWith("@starnav.com.br")
+  ) {
     redirect("/login");
   }
 
   const userSector = session?.user?.sector; // obtenha do session
-
-  // ✅ CORREÇÃO: Await searchParams antes de acessar suas propriedades
   const actualSearchParams = await searchParams;
-
   const query = actualSearchParams?.query || "";
   const statusFilter = actualSearchParams?.status || "";
   const priorityFilter = actualSearchParams?.priority || "";
-
-  // Constrói o objeto 'where' para o Prisma
   const whereClause: any = {};
 
   if (query) {
@@ -85,7 +94,6 @@ export default async function ServiceOrdersPage({ searchParams }: ServiceOrdersP
     ];
   }
 
-  // ✅ CORREÇÃO DO ERRO DO PRISMA: Validar e tipar os valores dos filtros para os enums
   if (statusFilter && statusFilter !== "TODOS") {
     if (Object.values(OrderStatus).includes(statusFilter as OrderStatus)) {
       whereClause.status = statusFilter;
@@ -118,12 +126,18 @@ export default async function ServiceOrdersPage({ searchParams }: ServiceOrdersP
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-3xl font-bold text-gray-800">Ordens de Serviço</h2>
         <Link href="/dashboard/service-orders/new">
-          <Button><Plus /> Nova OS</Button>
+          <Button>
+            <Plus /> Nova OS
+          </Button>
         </Link>
       </div>
 
       <div className="mb-6 rounded-md border p-4 bg-white shadow-sm">
-        <form action="/dashboard/service-orders" method="GET" className="space-y-4">
+        <form
+          action="/dashboard/service-orders"
+          method="GET"
+          className="space-y-4"
+        >
           <div className="relative">
             <Input
               type="text"
@@ -134,7 +148,11 @@ export default async function ServiceOrdersPage({ searchParams }: ServiceOrdersP
             />
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             {query && (
-              <Link href="/dashboard/service-orders" passHref className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
+              <Link
+                href="/dashboard/service-orders"
+                passHref
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              >
                 <XIcon className="h-5 w-5" />
               </Link>
             )}
@@ -150,7 +168,7 @@ export default async function ServiceOrdersPage({ searchParams }: ServiceOrdersP
                   <SelectItem value="TODOS">Todos os Status</SelectItem>
                   {Object.values(OrderStatus).map((statusValue) => (
                     <SelectItem key={statusValue} value={statusValue}>
-                      {statusValue.replace(/_/g, ' ')}
+                      {statusValue.replace(/_/g, " ")}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -166,20 +184,24 @@ export default async function ServiceOrdersPage({ searchParams }: ServiceOrdersP
                   <SelectItem value="TODAS">Todas as Prioridades</SelectItem>
                   {Object.values(Priority).map((priorityValue) => (
                     <SelectItem key={priorityValue} value={priorityValue}>
-                      {priorityValue.replace(/_/g, ' ')}
+                      {priorityValue.replace(/_/g, " ")}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <Button type="submit" className="md:w-auto">Aplicar Filtros</Button>
+            <Button type="submit" className="md:w-auto">
+              Aplicar Filtros
+            </Button>
           </div>
         </form>
       </div>
 
       {serviceOrders.length === 0 ? (
-        <p className="text-center text-gray-600 mt-8">Nenhuma Ordem de Serviço encontrada com os filtros aplicados.</p>
+        <p className="text-center text-gray-600 mt-8">
+          Nenhuma Ordem de Serviço encontrada com os filtros aplicados.
+        </p>
       ) : (
         <div className="rounded-md border">
           <Table>
@@ -198,26 +220,45 @@ export default async function ServiceOrdersPage({ searchParams }: ServiceOrdersP
             <TableBody>
               {serviceOrders.map((order) => (
                 <TableRow key={order.id}>
-                  <TableCell className="font-medium">{order.id.substring(0, 6)}...</TableCell>
+                  <TableCell className="font-medium">
+                    {order.id.substring(0, 6)}...
+                  </TableCell>
                   <TableCell>{order.title}</TableCell>
                   <TableCell>{order.ship}</TableCell>
                   <TableCell>
-                    <span className={`font-semibold ${
-                        order.status === "CONCLUIDA" ? "text-green-600" :
-                        order.status === "PENDENTE" ? "text-yellow-600" :
-                        order.status === "EM_EXECUCAO" ? "text-blue-600" :
-                        "text-gray-600"
-                      }`}>{order.status.replace(/_/g, ' ')}</span>
+                    <span
+                      className={`font-semibold ${
+                        order.status === "CONCLUIDA"
+                          ? "text-green-600"
+                          : order.status === "PENDENTE"
+                          ? "text-yellow-600"
+                          : order.status === "EM_EXECUCAO"
+                          ? "text-blue-600"
+                          : "text-gray-600"
+                      }`}
+                    >
+                      {order.status.replace(/_/g, " ")}
+                    </span>
                   </TableCell>
                   <TableCell>
-                    <span className={`font-semibold ${
-                        order.priority === "URGENTE" ? "text-red-600" :
-                        order.priority === "ALTA" ? "text-orange-600" :
-                        "text-gray-600"
-                      }`}>{order.priority.replace(/_/g, ' ')}</span>
+                    <span
+                      className={`font-semibold ${
+                        order.priority === "URGENTE"
+                          ? "text-red-600"
+                          : order.priority === "ALTA"
+                          ? "text-orange-600"
+                          : "text-gray-600"
+                      }`}
+                    >
+                      {order.priority.replace(/_/g, " ")}
+                    </span>
                   </TableCell>
-                  <TableCell>{order.createdBy?.name || order.createdBy?.email}</TableCell>
-                  <TableCell>{order.dueDate ? formatDate(order.dueDate) : "N/A"}</TableCell>
+                  <TableCell>
+                    {order.createdBy?.name || order.createdBy?.email}
+                  </TableCell>
+                  <TableCell>
+                    {order.dueDate ? formatDate(order.dueDate) : "N/A"}
+                  </TableCell>
                   <TableCell className="text-right space-x-2">
                     <OrderActions
                       userSector={userSector}

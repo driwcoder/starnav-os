@@ -3,10 +3,42 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { OrderStatus, UserRole, UserSector } from "@prisma/client"; // Importe enums do Prisma
+import { OrderStatus, UserRole, UserSector, SolutionType } from "@prisma/client"; // Added SolutionType import
 import StatusSummaryCard from "./components/StatusSummaryCard";
 import OrderList from "./components/OrderList";
-import StatusFilter from "./components/StatusFilter"; // Importe StatusFilter
+import StatusFilter from "./components/StatusFilter";
+
+// Add the canEditOrder function from service-orders page
+function canEditOrder({
+  userSector,
+  status,
+  solutionType,
+}: {
+  userSector: UserSector;
+  status: OrderStatus;
+  solutionType?: SolutionType | null;
+}) {
+  if (userSector === UserSector.TRIPULACAO) {
+    if (["PENDENTE", "RECUSADA"].includes(status)) return true;
+    if (status === "EM_EXECUCAO" && solutionType === "INTERNA") return true;
+    return false;
+  }
+  if (
+    [UserSector.MANUTENCAO, UserSector.OPERACAO].includes(userSector as any)
+  ) {
+    return [
+      "PENDENTE",
+      "APROVADA",
+      "RECUSADA",
+      "PLANEJADA",
+      "EM_ANALISE",
+    ].includes(status);
+  }
+  if (userSector === UserSector.SUPRIMENTOS) {
+    return ["AGUARDANDO_SUPRIMENTOS", "CONTRATADA"].includes(status);
+  }
+  return false;
+}
 
 // ✅ CORREÇÃO: Tipagem direta das props com 'any' para contornar o problema do compilador
 export default async function MinhasOSPage({ searchParams }: any) {
@@ -37,6 +69,7 @@ export default async function MinhasOSPage({ searchParams }: any) {
     : [];
 
   const userRole = session.user.role;
+  const userSector = session.user.sector; // Get user sector for permissions
   const whereClause: any = {};
 
   // Lógica para Admin e outros usuários (mantida do código anterior, sem historico por enquanto)
@@ -95,7 +128,11 @@ export default async function MinhasOSPage({ searchParams }: any) {
           ))}
       </div>
       <div className="mt-10">
-        <OrderList os={serviceOrders} />
+        <OrderList 
+          os={serviceOrders} 
+          userSector={userSector}
+          canEditOrder={canEditOrder}
+        />
       </div>
     </div>
   );

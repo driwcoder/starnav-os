@@ -7,7 +7,6 @@ import * as z from "zod";
 import { UserRole, UserSector } from "@prisma/client";
 
 const idSchema = z.string().uuid("ID de usuário inválido.");
-
 const updateUserSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   email: z.string().email("Formato de e-mail inválido.").endsWith("@starnav.com.br", "O e-mail deve ser @starnav.com.br.").optional(),
@@ -23,9 +22,7 @@ export async function GET(request: Request, { params }: { params: any }) {
   try {
     const actualParams = await params;
     const id = actualParams.id as string;
-
     const session = await getServerSession(authOptions);
-    // ✅ CORREÇÃO: Função auxiliar para verificar permissão para VISUALIZAÇÃO
     const hasViewPermission = (userRole: UserRole | undefined, userSector: UserSector | undefined) => {
       if (!userRole || !userSector) return false;
       if (userRole === UserRole.ADMIN) return true;
@@ -34,9 +31,9 @@ export async function GET(request: Request, { params }: { params: any }) {
         UserRole.GESTOR,
         UserRole.SUPERVISOR,
         UserRole.COORDENADOR,
-        UserRole.COMPRADOR_JUNIOR, // ✅ Novo cargo
-        UserRole.COMPRADOR_PLENO, // ✅ Novo cargo
-        UserRole.COMPRADOR_SENIOR, // ✅ Novo cargo
+        UserRole.COMPRADOR_JUNIOR,
+        UserRole.COMPRADOR_PLENO,
+        UserRole.COMPRADOR_SENIOR,
         UserRole.COMANDANTE,
         UserRole.IMEDIATO,
         UserRole.OQN,
@@ -47,7 +44,6 @@ export async function GET(request: Request, { params }: { params: any }) {
         UserRole.AUXILIAR,
         UserRole.ESTAGIARIO,
       ];
-      // ✅ CORREÇÃO: Incluindo TODOS os setores válidos para visualização
       const allowedSectors = [
         UserSector.ADMINISTRACAO,
         UserSector.MANUTENCAO,
@@ -94,7 +90,6 @@ export async function PUT(request: Request, { params }: { params: any }) {
     const id = actualParams.id as string;
 
     const session = await getServerSession(authOptions);
-    // ✅ CORREÇÃO: Função auxiliar para verificar permissão para EDIÇÃO
     const hasEditPermission = (userRole: UserRole | undefined, userSector: UserSector | undefined) => {
       if (!userRole || !userSector) return false;
       if (userRole === UserRole.ADMIN) return true;
@@ -103,10 +98,10 @@ export async function PUT(request: Request, { params }: { params: any }) {
         UserRole.GESTOR,
         UserRole.SUPERVISOR,
         UserRole.COORDENADOR,
-        UserRole.COMPRADOR_JUNIOR, // ✅ Novo cargo
-        UserRole.COMPRADOR_PLENO, // ✅ Novo cargo
-        UserRole.COMPRADOR_SENIOR, // ✅ Novo cargo
-        UserRole.COMANDANTE, // Tripulação também pode editar certas coisas (se o fluxo permitir)
+        UserRole.COMPRADOR_JUNIOR,
+        UserRole.COMPRADOR_PLENO,
+        UserRole.COMPRADOR_SENIOR,
+        UserRole.COMANDANTE,
         UserRole.IMEDIATO,
         UserRole.OQN,
         UserRole.CHEFE_MAQUINAS,
@@ -116,13 +111,12 @@ export async function PUT(request: Request, { params }: { params: any }) {
         UserRole.AUXILIAR,
         UserRole.ESTAGIARIO,
       ];
-      // ✅ CORREÇÃO: Incluindo TODOS os setores válidos para edição
       const allowedEditSectors = [
         UserSector.ADMINISTRACAO,
         UserSector.MANUTENCAO,
         UserSector.OPERACAO,
         UserSector.SUPRIMENTOS,
-        UserSector.TRIPULACAO, // Tripulação pode editar suas próprias OSs
+        UserSector.TRIPULACAO,
         UserSector.ALMOXARIFADO,
         UserSector.RH,
         UserSector.TI,
@@ -142,7 +136,6 @@ export async function PUT(request: Request, { params }: { params: any }) {
     }
 
     const body = await request.json();
-
     const validatedData = updateUserSchema.safeParse(body);
 
     if (!validatedData.success) {
@@ -151,7 +144,6 @@ export async function PUT(request: Request, { params }: { params: any }) {
     }
 
     const { email, ...dataToUpdate } = validatedData.data;
-
     const updatedUser = await prisma.user.update({
       where: { id: validatedId.data },
       data: {
@@ -169,12 +161,10 @@ export async function PUT(request: Request, { params }: { params: any }) {
   }
 }
 
-// Handler para Requisições DELETE (Exclusão)
 export async function DELETE(request: Request, { params }: { params: any }) {
   try {
     const actualParams = await params;
     const id = actualParams.id as string;
-
     const session = await getServerSession(authOptions);
 
     if (!session || !(session.user?.email as string)?.endsWith("@starnav.com.br") || (session?.user?.role !== UserRole.ADMIN)) {

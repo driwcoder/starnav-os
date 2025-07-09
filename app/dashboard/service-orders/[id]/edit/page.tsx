@@ -1,8 +1,7 @@
 // app/dashboard/service-orders/[id]/edit/page.tsx
 "use client";
 
-import type { SubmitHandler } from "react-hook-form";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
@@ -28,7 +27,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
-import { ArrowLeftIcon, FrownIcon, PaperclipIcon } from "lucide-react";
+import { ArrowLeftIcon, FrownIcon } from "lucide-react";
 import {
   OrderStatus,
   Priority,
@@ -36,8 +35,7 @@ import {
   UserSector,
   SolutionType,
 } from "@prisma/client";
-import { ConfirmDeleteAttachment } from "@/components/confirm-delete-attachment";
-import { PutBlobResult } from "@vercel/blob";
+import { canEditOs, isValidStatusTransition } from "@/lib/permissions";
 
 // --- Definição do Schema de Validação com Zod ---
 const formSchema = z.object({
@@ -85,7 +83,6 @@ const formSchema = z.object({
   contractDate: z.string().optional().nullable(),
   serviceOrderCost: z.number().min(0).optional().nullable(),
   supplierNotes: z.string().optional().nullable(),
-  reportAttachments: z.array(z.string().url()),
 });
 
 // --- Componente da Página ---
@@ -97,9 +94,10 @@ export default function EditServiceOrderPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [serviceOrder, setServiceOrder] = useState<any>(null);
-  const inputFileRef = useRef<HTMLInputElement>(null);
-  const [blob, setBlob] = useState<any>(null);
+  const [currentOsStatus, setCurrentOsStatus] = useState<OrderStatus | null>(
+    null
+  );
+  const [osCreatedById, setOsCreatedById] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -122,164 +120,132 @@ export default function EditServiceOrderPage() {
       contractDate: null,
       serviceOrderCost: null,
       supplierNotes: null,
-      reportAttachments: [],
     },
   });
 
-  const hasEditPermission = (
-    userRole: UserRole | undefined,
-    userSector: UserSector | undefined
-  ) => {
-    if (!userRole || !userSector) return false;
-    if (userRole === UserRole.ADMIN) return true;
-
-    const allowedEditRoles = [
-      UserRole.GESTOR,
-      UserRole.SUPERVISOR,
-      UserRole.COORDENADOR,
-      UserRole.COMPRADOR_JUNIOR,
-      UserRole.COMPRADOR_PLENO,
-      UserRole.COMPRADOR_SENIOR,
-      UserRole.COMANDANTE,
-      UserRole.IMEDIATO,
-      UserRole.OQN,
-      UserRole.CHEFE_MAQUINAS,
-      UserRole.SUB_CHEFE_MAQUINAS,
-      UserRole.OQM,
-      UserRole.ASSISTENTE,
-      UserRole.AUXILIAR,
-      UserRole.ESTAGIARIO,
-    ];
-    const allowedEditSectors = [
-      UserSector.ADMINISTRACAO,
-      UserSector.MANUTENCAO,
-      UserSector.OPERACAO,
-      UserSector.SUPRIMENTOS,
-      UserSector.TRIPULACAO,
-      UserSector.ALMOXARIFADO,
-      UserSector.RH,
-      UserSector.TI,
-      UserSector.NAO_DEFINIDO,
-    ];
-
-    return (
-      allowedEditRoles.includes(userRole) &&
-      allowedEditSectors.includes(userSector)
-    );
-  };
-
-  // Função de permissão igual...
-
-  // 1. Buscar dados da OS apenas quando necessário
   useEffect(() => {
-    if (!id || status === "loading") return;
+    if (!id) return;
 
-    if (
-      status === "unauthenticated" ||
-      !(session?.user?.email as string)?.endsWith("@starnav.com.br")
-    ) {
-      toast.error("Acesso negado. Por favor, faça login.");
-      router.push("/login");
-      return;
-    }
-    if (!hasEditPermission(session?.user?.role, session?.user?.sector)) {
-      toast.error("Você não tem permissão para editar esta Ordem de Serviço.");
-      router.push("/dashboard");
-      return;
-    }
+    async function fetchServiceOrder() {
+      setLoading(true);
+      setError(null);
+      try {
+        if (status === "loading") return;
+        if (
+          status === "unauthenticated" ||
+          !(session?.user?.email as string)?.endsWith("@starnav.com.br")
+        ) {
+          toast.error("Acesso negado. Por favor, faça login.");
+          router.push("/login");
+          return;
+        }
 
-    setLoading(true);
-    setError(null);
-
-    fetch(`/api/service-orders/${id}`)
-      .then(async (response) => {
+        const response = await fetch(`/api/service-orders/${id}`);
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(
             errorData.message || "Erro ao carregar Ordem de Serviço."
           );
         }
-        return response.json();
-      })
-      .then((data) => {
-        setServiceOrder(data);
-        setError(null);
-      })
-      .catch((err: any) => {
+        const data = await response.json();
+
+        setCurrentOsStatus(data.status);
+        setOsCreatedById(data.createdById);
+
+        if (!canEditOs(data.status, data.createdById, session?.user as any)) {
+          toast.error(
+            "Você não tem permissão para editar esta Ordem de Serviço com o status atual."
+          );
+          router.push("/dashboard/service-orders");
+          return;
+        }
+
+        form.reset({
+          title: data.title,
+          description: data.description,
+          scopeOfService: data.scopeOfService,
+          ship: data.ship,
+          location: data.location,
+          priority: data.priority,
+          assignedToId: data.assignedToId || null,
+          dueDate: data.dueDate
+            ? new Date(data.dueDate).toISOString().split("T")[0]
+            : null,
+          status: data.status,
+          plannedStartDate: data.plannedStartDate
+            ? new Date(data.plannedStartDate).toISOString().split("T")[0]
+            : null,
+          plannedEndDate: data.plannedEndDate
+            ? new Date(data.plannedEndDate).toISOString().split("T")[0]
+            : null,
+          solutionType: data.solutionType || null,
+          responsibleCrew: data.responsibleCrew || null,
+          coordinatorNotes: data.coordinatorNotes || null,
+          contractedCompany: data.contractedCompany || null,
+          contractDate: data.contractDate
+            ? new Date(data.contractDate).toISOString().split("T")[0]
+            : null,
+          serviceOrderCost:
+            data.serviceOrderCost !== undefined &&
+            data.serviceOrderCost !== null
+              ? parseFloat(data.serviceOrderCost)
+              : null,
+          supplierNotes: data.supplierNotes || null,
+        });
+      } catch (err: any) {
         setError(
           err.message || "Não foi possível carregar a Ordem de Serviço."
         );
         toast.error(
           "Erro ao carregar OS: " + (err.message || "Erro desconhecido.")
         );
-      })
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    id,
-    status,
-    session?.user?.email,
-    session?.user?.role,
-    session?.user?.sector,
-    router,
-  ]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchServiceOrder();
+  }, [id, form, session, status, router]);
 
-  // 2. Resetar o formulário apenas quando serviceOrder mudar
-  useEffect(() => {
-    if (!serviceOrder) return;
-    form.reset({
-      title: serviceOrder.title,
-      description: serviceOrder.description,
-      scopeOfService: serviceOrder.scopeOfService,
-      ship: serviceOrder.ship,
-      location: serviceOrder.location,
-      priority: serviceOrder.priority,
-      assignedToId: serviceOrder.assignedToId || null,
-      dueDate: serviceOrder.dueDate
-        ? new Date(serviceOrder.dueDate).toISOString().split("T")[0]
-        : null,
-      status: serviceOrder.status,
-      plannedStartDate: serviceOrder.plannedStartDate
-        ? new Date(serviceOrder.plannedStartDate).toISOString().split("T")[0]
-        : null,
-      plannedEndDate: serviceOrder.plannedEndDate
-        ? new Date(serviceOrder.plannedEndDate).toISOString().split("T")[0]
-        : null,
-      solutionType: serviceOrder.solutionType || null,
-      responsibleCrew: serviceOrder.responsibleCrew || null,
-      coordinatorNotes: serviceOrder.coordinatorNotes || null,
-      contractedCompany: serviceOrder.contractedCompany || null,
-      contractDate: serviceOrder.contractDate
-        ? new Date(serviceOrder.contractDate).toISOString().split("T")[0]
-        : null,
-      serviceOrderCost:
-        serviceOrder.serviceOrderCost !== undefined &&
-        serviceOrder.serviceOrderCost !== null
-          ? parseFloat(serviceOrder.serviceOrderCost)
-          : null,
-      supplierNotes: serviceOrder.supplierNotes || null,
-      reportAttachments: serviceOrder.reportAttachments || [],
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serviceOrder]);
-
-  const onSubmit: SubmitHandler<z.infer<typeof formSchema>> = async (
-    values
-  ) => {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    // Certifique-se de que currentOsStatus e osCreatedById não são null/undefined aqui
     if (
+      !currentOsStatus ||
+      !osCreatedById ||
       status === "unauthenticated" ||
       !(session?.user?.email as string)?.endsWith("@starnav.com.br") ||
-      !hasEditPermission(session?.user?.role, session?.user?.sector)
+      !canEditOs(currentOsStatus, osCreatedById, session?.user as any)
     ) {
       toast.error("Você não tem permissão para realizar esta ação.");
       router.push("/dashboard");
       return;
     }
 
+    if (values.status !== currentOsStatus) {
+      // Se o status foi alterado
+      if (
+        !isValidStatusTransition(
+          currentOsStatus,
+          values.status,
+          session?.user as any
+        )
+      ) {
+        toast.error(
+          `Transição de status de '${currentOsStatus.replace(
+            /_/g,
+            " "
+          )}' para '${values.status.replace(
+            /_/g,
+            " "
+          )}' não permitida para o seu perfil.`
+        );
+        form.setValue("status", currentOsStatus);
+        return;
+      }
+    }
+
     try {
       const payload = {
         ...values,
-        reportAttachments: values.reportAttachments || [],
         dueDate: values.dueDate ? new Date(values.dueDate).toISOString() : null,
         plannedStartDate: values.plannedStartDate
           ? new Date(values.plannedStartDate).toISOString()
@@ -315,7 +281,7 @@ export default function EditServiceOrderPage() {
       router.push(`/dashboard/service-orders/${id}`);
     } catch (err) {
       console.error("Erro ao atualizar OS:", err);
-      toast.error("Você não esta autorizado a editar OS com este Status");
+      toast.error("Erro de rede ao atualizar OS.");
     }
   };
 
@@ -329,16 +295,14 @@ export default function EditServiceOrderPage() {
 
   if (
     status === "unauthenticated" ||
-    !(session?.user?.email as string)?.endsWith("@starnav.com.br") ||
-    !hasEditPermission(session?.user?.role, session?.user?.sector)
+    !(session?.user?.email as string)?.endsWith("@starnav.com.br")
   ) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
         <FrownIcon className="h-20 w-20 text-red-400 mb-4" />
         <h2 className="text-2xl font-bold text-red-700 mb-2">Acesso Negado</h2>
         <p className="text-gray-500 mb-6">
-          Você não tem permissão para acessar esta página ou seu acesso é
-          restrito.
+          Você precisa estar logado para acessar esta página.
         </p>
         <Button onClick={() => router.push("/login")}>Ir para Login</Button>
       </div>
@@ -370,15 +334,112 @@ export default function EditServiceOrderPage() {
     );
   }
 
-  if (!form.getValues("title")) {
+  // ✅ NOVO: Geração da lista de status disponíveis para transição
+  const getAvailableNextStatuses = (
+    current: OrderStatus,
+    userSess: any
+  ): OrderStatus[] => {
+    if (userSess.role === UserRole.ADMIN) {
+      return Object.values(OrderStatus); // Admin vê todos os status
+    }
+
+    // Mapeamento de transições válidas (copiado de lib/permissions.ts para uso no frontend)
+    const VALID_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+      [OrderStatus.PENDENTE]: [OrderStatus.EM_ANALISE, OrderStatus.RECUSADA],
+      [OrderStatus.EM_ANALISE]: [
+        OrderStatus.APROVADA,
+        OrderStatus.RECUSADA,
+        OrderStatus.PLANEJADA,
+      ],
+      [OrderStatus.APROVADA]: [OrderStatus.PLANEJADA, OrderStatus.EM_EXECUCAO],
+      [OrderStatus.PLANEJADA]: [
+        OrderStatus.AGUARDANDO_SUPRIMENTOS,
+        OrderStatus.EM_EXECUCAO,
+      ],
+      [OrderStatus.AGUARDANDO_SUPRIMENTOS]: [
+        OrderStatus.CONTRATADA,
+        OrderStatus.AGUARDANDO_PECAS,
+        OrderStatus.CANCELADA,
+      ],
+      [OrderStatus.CONTRATADA]: [
+        OrderStatus.EM_EXECUCAO,
+        OrderStatus.CANCELADA,
+      ],
+      [OrderStatus.EM_EXECUCAO]: [
+        OrderStatus.CONCLUIDA,
+        OrderStatus.AGUARDANDO_PECAS,
+        OrderStatus.CANCELADA,
+      ],
+      [OrderStatus.AGUARDANDO_PECAS]: [
+        OrderStatus.EM_EXECUCAO,
+        OrderStatus.CANCELADA,
+      ],
+      [OrderStatus.CONCLUIDA]: [OrderStatus.APROVADA, OrderStatus.CANCELADA],
+      [OrderStatus.CANCELADA]: [OrderStatus.PENDENTE],
+      [OrderStatus.RECUSADA]: [OrderStatus.PENDENTE],
+    };
+
+    const nextStatuses = VALID_STATUS_TRANSITIONS[current] || [];
+
+    // Filtrar com base no perfil do usuário
+    switch (userSess.sector) {
+      case UserSector.TRIPULACAO:
+        const allowedTripulacaoStatus: OrderStatus[] = [
+          OrderStatus.EM_ANALISE,
+          OrderStatus.CONCLUIDA,
+          OrderStatus.AGUARDANDO_PECAS,
+          OrderStatus.PENDENTE,
+          OrderStatus.RECUSADA,
+          OrderStatus.EM_EXECUCAO,
+        ];
+        return nextStatuses.filter((s) => allowedTripulacaoStatus.includes(s));
+
+      case UserSector.MANUTENCAO:
+      case UserSector.OPERACAO:
+        const allowedManutencaoOperacaoStatus: OrderStatus[] = [
+          OrderStatus.EM_ANALISE,
+          OrderStatus.APROVADA,
+          OrderStatus.RECUSADA,
+          OrderStatus.PLANEJADA,
+          OrderStatus.AGUARDANDO_SUPRIMENTOS,
+          OrderStatus.EM_EXECUCAO,
+          OrderStatus.AGUARDANDO_PECAS,
+          OrderStatus.CONCLUIDA,
+          OrderStatus.CANCELADA,
+          OrderStatus.PENDENTE,
+        ];
+        return nextStatuses.filter((s) =>
+          allowedManutencaoOperacaoStatus.includes(s)
+        );
+
+      case UserSector.SUPRIMENTOS:
+        const allowedSuprimentosStatus: OrderStatus[] = [
+          OrderStatus.CONTRATADA,
+          OrderStatus.EM_EXECUCAO,
+          OrderStatus.AGUARDANDO_PECAS,
+          OrderStatus.CANCELADA,
+          OrderStatus.AGUARDANDO_SUPRIMENTOS, // Incluir AGUARDANDO_SUPRIMENTOS se eles precisam ver/interagir com ele
+        ];
+        return nextStatuses.filter((s) => allowedSuprimentosStatus.includes(s));
+      default:
+        return [];
+    }
+  };
+
+  if (
+    !form.getValues("title") ||
+    !currentOsStatus ||
+    !canEditOs(currentOsStatus, osCreatedById!, session?.user as any)
+  ) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
         <FrownIcon className="h-20 w-20 text-gray-400 mb-4" />
         <h2 className="text-2xl font-bold text-gray-700 mb-2">
-          Ordem de Serviço Não Encontrada
+          Acesso Negado ou OS Não Encontrada
         </h2>
         <p className="text-gray-500 mb-6">
-          A Ordem de Serviço com o ID "{id}" não existe ou foi removida.
+          Você não tem permissão para editar esta Ordem de Serviço com o status
+          atual, ou a OS não existe/foi removida.
         </p>
         <Link href="/dashboard/service-orders">
           <Button>Voltar para a lista de OS</Button>
@@ -386,6 +447,10 @@ export default function EditServiceOrderPage() {
       </div>
     );
   }
+
+  const availableStatusOptions = currentOsStatus
+    ? getAvailableNextStatuses(currentOsStatus, session?.user as any)
+    : [];
 
   return (
     <div className="container mx-auto py-8">
@@ -397,13 +462,7 @@ export default function EditServiceOrderPage() {
           <CardDescription className="text-center">ID: {id}</CardDescription>
         </CardHeader>
         <CardContent>
-          <form
-            onSubmit={form.handleSubmit(
-              onSubmit as SubmitHandler<z.infer<typeof formSchema>>
-            )}
-            className="space-y-6"
-          >
-            {/* Campos Existentes */}
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div>
               <Label htmlFor="title">Título da OS</Label>
               <Input id="title" {...form.register("title")} />
@@ -471,7 +530,7 @@ export default function EditServiceOrderPage() {
                 onValueChange={(value) =>
                   form.setValue("priority", value as Priority)
                 }
-                value={form.watch("priority") || "MEDIA"} // ✅ Adicionado || "" para lidar com null/undefined
+                value={form.watch("priority") || ""}
               >
                 <SelectTrigger id="priority">
                   <SelectValue placeholder="Selecione a prioridade" />
@@ -479,8 +538,7 @@ export default function EditServiceOrderPage() {
                 <SelectContent>
                   <SelectItem value="Prioridade">
                     Selecione uma prioridade
-                  </SelectItem>{" "}
-                  {/* ✅ Placeholder com valor vazio */}
+                  </SelectItem>
                   {Object.values(Priority).map((priorityValue) => (
                     <SelectItem key={priorityValue} value={priorityValue}>
                       {priorityValue.replace(/_/g, " ")}
@@ -506,26 +564,39 @@ export default function EditServiceOrderPage() {
             </div>
 
             <div>
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status">Novo Status</Label>
               <Select
                 onValueChange={(value) =>
                   form.setValue("status", value as OrderStatus)
                 }
-                value={form.watch("status") || "MEDIA"} // ✅ Adicionado || "" para lidar com null/undefined
+                value={form.watch("status") || ""}
               >
                 <SelectTrigger id="status">
                   <SelectValue placeholder="Selecione o status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Atualize o Status">
-                    Selecione um status
-                  </SelectItem>{" "}
-                  {/* ✅ Placeholder com valor vazio */}
-                  {Object.values(OrderStatus).map((statusValue) => (
-                    <SelectItem key={statusValue} value={statusValue}>
-                      {statusValue.replace(/_/g, " ")}
+                  {/* ✅ NOVO: Mostrar o status atual como primeira opção */}
+                  {currentOsStatus && (
+                    <SelectItem key={currentOsStatus} value={currentOsStatus}>
+                      {currentOsStatus.replace(/_/g, " ")} (Atual)
                     </SelectItem>
-                  ))}
+                  )}
+
+                  {/* ✅ NOVO: Separador visual se houver outras opções */}
+                  {availableStatusOptions.length > 0 && currentOsStatus && (
+                    <div className="px-2 py-1 text-xs text-gray-500 border-b">
+                      Outras opções:
+                    </div>
+                  )}
+
+                  {/* ✅ MODIFICADO: Filtra os status para não duplicar o atual */}
+                  {availableStatusOptions
+                    .filter(statusValue => statusValue !== currentOsStatus)
+                    .map((statusValue) => (
+                      <SelectItem key={statusValue} value={statusValue}>
+                        {statusValue.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               {form.formState.errors.status && (
@@ -585,7 +656,7 @@ export default function EditServiceOrderPage() {
                   <SelectValue placeholder="Selecione o tipo de solução" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Selecione...">Não Definido</SelectItem>
+                  <SelectItem value="Defina">Não Definido</SelectItem>
                   {Object.values(SolutionType).map((typeValue) => (
                     <SelectItem key={typeValue} value={typeValue}>
                       {typeValue.replace(/_/g, " ")}
@@ -630,11 +701,10 @@ export default function EditServiceOrderPage() {
                 </p>
               )}
             </div>
-
-            <hr className="my-4 col-span-full" />
-
-            {session?.user.sector === "SUPRIMENTOS" && (
+            {session?.user?.sector === UserSector.SUPRIMENTOS && (
               <>
+                <hr className="my-4 col-span-full" />
+
                 <h3 className="font-semibold text-lg text-gray-800 col-span-full">
                   Informações de Suprimentos
                 </h3>
@@ -668,18 +738,13 @@ export default function EditServiceOrderPage() {
                     </p>
                   )}
                 </div>
-
                 <div>
-                  <Label htmlFor="serviceOrderCost">
-                    Custo do Serviço (R$)
-                  </Label>
+                  <Label htmlFor="serviceOrderCost">Custo do Serviço (R$)</Label>
                   <Input
                     id="serviceOrderCost"
                     type="number"
                     step="0.01"
-                    {...form.register("serviceOrderCost", {
-                      valueAsNumber: true,
-                    })}
+                    {...form.register("serviceOrderCost", { valueAsNumber: true })}
                     placeholder="Ex: 3500.00"
                   />
                   {form.formState.errors.serviceOrderCost && (
@@ -688,7 +753,6 @@ export default function EditServiceOrderPage() {
                     </p>
                   )}
                 </div>
-
                 <div className="col-span-full">
                   <Label htmlFor="supplierNotes">
                     Notas do Suprimentos (Opcional)
@@ -707,6 +771,7 @@ export default function EditServiceOrderPage() {
                 </div>
               </>
             )}
+
             {/* Botões de Ação */}
             <div className="flex gap-4 col-span-full mt-6">
               <Button
@@ -728,132 +793,6 @@ export default function EditServiceOrderPage() {
                 </Button>
               </Link>
             </div>
-
-            {/* Upload de Relatório/Anexo */}
-            {/* Upload de Relatório/Anexo */}
-            <div className="space-y-2">
-              <Label className="font-semibold">Anexar Relatório</Label>
-              <div className="flex items-center gap-4">
-                <input
-                  name="file"
-                  ref={inputFileRef}
-                  type="file"
-                  accept="image/jpeg, image/png, image/webp,application/pdf"
-                  className="block w-full text-sm text-gray-700 border border-gray-300 rounded-md cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex items-center gap-2"
-                  onClick={async () => {
-                    if (!inputFileRef.current?.files?.length) {
-                      toast.error("Selecione um arquivo para anexar.");
-                      return;
-                    }
-                    const file = inputFileRef.current.files[0];
-                    try {
-                      const response = await fetch(
-                        `/api/blob/upload?filename=${file.name}`,
-                        {
-                          method: "POST",
-                          body: file,
-                        }
-                      );
-                      if (!response.ok) {
-                        toast.error("Falha ao fazer upload do arquivo.");
-                        return;
-                      }
-                      const newBlob = (await response.json()) as PutBlobResult;
-                      setBlob(newBlob);
-                      form.setValue("reportAttachments", [
-                        ...(form.getValues("reportAttachments") || []),
-                        newBlob.url,
-                      ]);
-                      toast.success("Arquivo anexado com sucesso!");
-                      if (inputFileRef.current) inputFileRef.current.value = "";
-                    } catch (err) {
-                      toast.error("Erro ao anexar arquivo.");
-                    }
-                  }}
-                >
-                  <PaperclipIcon className="h-5 w-5" />
-                  Anexar
-                </Button>
-              </div>
-              {blob && (
-                <div className="text-xs text-gray-500">
-                  Último anexo:{" "}
-                  <a
-                    href={blob.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 underline"
-                  >
-                    {blob.url}
-                  </a>
-                </div>
-              )}
-
-              {/* Lista de anexos já existentes */}
-              <div className="mt-6">
-                <h3 className="font-semibold text-lg text-gray-800 mb-2">
-                  Anexos da Ordem de Serviço
-                </h3>
-                {form.watch("reportAttachments")?.length > 0 ? (
-                  <ul className="space-y-2">
-                    {form.watch("reportAttachments").map((url, index) => (
-                      <li
-                        key={index}
-                        className="flex justify-between items-center bg-gray-100 px-3 py-2 rounded"
-                      >
-                        <a
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 underline break-all"
-                        >
-                          {url.split("/").pop()}
-                        </a>
-                        <ConfirmDeleteAttachment
-                          fileUrl={url}
-                          onConfirm={async () => {
-                            try {
-                              const res = await fetch(`/api/blob/delete`, {
-                                method: "POST",
-                                headers: {
-                                  "Content-Type": "application/json",
-                                },
-                                body: JSON.stringify({ url }),
-                              });
-
-                              if (!res.ok) {
-                                throw new Error("Erro ao excluir o arquivo.");
-                              }
-
-                              const updated =
-                                form
-                                  .getValues("reportAttachments")
-                                  ?.filter((_, i) => i !== index) || [];
-                              form.setValue("reportAttachments", updated);
-                            } catch (error) {
-                              toast.error("Erro ao excluir o anexo.");
-                            }
-                          }}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-500">Nenhum anexo cadastrado.</p>
-                )}
-                {form.formState.errors.reportAttachments && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {form.formState.errors.reportAttachments.message}
-                  </p>
-                )}
-              </div>
-            </div>
-            {/* Fim do Upload de Relatório/Anexo */}
           </form>
         </CardContent>
       </Card>
