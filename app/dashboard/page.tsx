@@ -1,10 +1,26 @@
-// app/dashboard/page.tsx
+
+import { ChartAreaInteractive } from "@/components/chart-area-interactive"
+import { DataTable } from "@/components/data-table"
+import { SectionCards } from "@/components/section-cards"
+import { SiteHeader } from "@/components/site-header"
+
+import data from "./data.json"
+
 export default function DashboardPage() {
   return (
-    <div className="container mx-auto">
-      <h2 className="mb-6 text-3xl font-bold text-gray-800">Visão Geral do Dashboard</h2>
-      <p className="text-gray-600">Aqui você verá um resumo dos processos, métricas e avisos importantes.</p>
-      {/* Futuramente, você adicionará cards com informações e gráficos aqui */}
-    </div>
-  );
+    <>
+      <SiteHeader />
+      <div className="flex flex-1 flex-col">
+        <div className="@container/main flex flex-1 flex-col gap-2">
+          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+            <SectionCards />
+            <div className="px-4 lg:px-6">
+              <ChartAreaInteractive />
+            </div>
+            <DataTable data={data} />
+          </div>
+        </div>
+      </div>
+    </>
+  )
 }

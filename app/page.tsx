@@ -34,7 +34,7 @@ export default function HomePage() {
                 </span>
               </p>
               <Button
-                onClick={() => signOut({ callbackUrl: "/login" })} // Redireciona para /login após deslogar
+                onClick={() => signOut({ callbackUrl: "/auth/login" })} // Redireciona para /login após deslogar
                 className="w-full max-w-xs"
               >
                 Sair
@@ -46,7 +46,7 @@ export default function HomePage() {
                 Você não está logado. Por favor, faça login para acessar o sistema.
               </p>
               <Button
-                onClick={() => (window.location.href = "/login")}
+                onClick={() => (window.location.href = "/auth/login")}
                 className="w-full max-w-xs bg-indigo-600 hover:bg-indigo-700"
               >
                 Ir para Login

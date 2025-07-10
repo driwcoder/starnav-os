@@ -6,7 +6,7 @@ export default withAuth(
   async function middleware(req) {
     const token = req.nextauth.token;
 
-    if (req.nextUrl.pathname === "/login" && token) {
+    if (req.nextUrl.pathname === "/auth/login" && token) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 
@@ -16,7 +16,7 @@ export default withAuth(
   },
   {
     pages: {
-      signIn: "/login",
+      signIn: "/auth/login",
     },
     callbacks: {
       authorized: ({ token }) => {
@@ -30,10 +30,9 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/",
-    "/api/hello",
     "/api/users/:path*",
     "/api/service-orders/:path*",
-    "/dashboard/profile", // ✅ Adiciona proteção para a página de perfil
+    "/profile", // ✅ Adiciona proteção para a página de perfil
     "/api/users/me/:path*", // ✅ Adiciona proteção para as APIs do próprio usuário
     // Adicione outras rotas específicas que precisam de proteção aqui
   ],

@@ -36,26 +36,26 @@ export default function Header() {
               </SheetHeader>
               <nav className="flex flex-col pl-4 space-y-4 pt-6">
                 <Link
-                  href="/dashboard/minhas-os"
+                  href="/minhas-os"
                   className="text-lg font-medium text-gray-700 hover:text-[#10679f]"
                 >
                   Minhas Ordens de Serviço
                 </Link>
                 <Link
-                  href="/dashboard/service-orders"
+                  href="/service-orders"
                   className="text-lg font-medium text-gray-700 hover:text-[#10679f]"
                 >
                   Ordens de Serviço
                 </Link>
                 <Link
-                  href="/dashboard/materials"
+                  href="/materials"
                   className="text-lg font-medium text-gray-700 hover:text-[#10679f]"
                 >
                   Materiais
                 </Link>
                 {session?.user?.role === "ADMIN" && (
                   <Link
-                    href="/dashboard/users"
+                    href="/users"
                     className="text-lg font-medium text-gray-700 hover:text-[#10679f]"
                   >
                     Usuários
@@ -86,14 +86,14 @@ export default function Header() {
                 Olá, {session.user.name || session.user.email}!
               </span>
               <Button
-                onClick={() => signOut({ callbackUrl: "/login" })}
+                onClick={() => signOut({ callbackUrl: "/auth/login" })}
                 variant="outline"
               >
                 Sair
               </Button>
             </>
           ) : (
-            <Button onClick={() => (window.location.href = "/login")}>
+            <Button onClick={() => (window.location.href = "/auth/login")}>
               Login
             </Button>
           )}

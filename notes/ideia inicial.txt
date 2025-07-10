@@ -1,0 +1,20 @@
+gostaria de uma aplicação em javascript, que terá as seguintes funções:
+
+Uma pagina de cadastro de usuários(apenas o usuário que tem a tag "dev" ou "gerente" poderá acessar esta área. Caso eu queira mudar, gostaria que tivesse um menu onde seleciono os usuários cadastrados e consigo dar acesso/permissão via checkbox)
+Os usuários terão tags, são elas: dev, presidente, diretor, gerente, coordenador, supervisor, assistente, auxiliar, estagiario.
+No registro dos usuários terá as informações básicas como: Nome, Setor, Cargo (que está vinculado as tags de permissão)
+as opções no select de setor são: Suprimentos, Manutenção, Operação, Financeiro, Logistica, TI, QSMS, Administrativo, RH, Almoxarifado.
+as opções no select de cargo são: dev, presidente, diretor, gerente, coordenador, supervisor, assistente, auxiliar, estagiário.
+
+Esse sistema será um gerenciador de ordens de serviço, onde terá registro de ordens de serviço, aprovação/recusa/alteração das ordens de serviço, o objetivo é o setor de suprimentos registrar as solicitações de serviços terceirizados para atender as OSs, as OSs são solicitadas pelos outros setores como: Manutenção, Operação, TI, QSMS, Administrativo.
+Toda OS aberta receberá a tag do setor do usuário que a criou, isto é importante para que o coordenador do setor possa organizar o atendimento desta OS de forma mais simples e filtrada,
+Os funcionários do setor de suprimentos terão que pegar essas OSs  que começam com status "pendente" e irão atrás de uma empresa para atender este serviço, assim que o funcionário ter uma resposta, o status será mudado para "programado", e assim que o serviço for finalizado e anexado um relatório em arquivo pdf, a OS irá pro status "concluída"
+
+Os campos de registro de OS serão: Ativo(string), Titulo(string), Data Solicitação(Date DD/MM/YYYY), Nome do Solicitante(string)
+
+As OSs registradas serão exibidas em uma página, onde será possível cadastrar nova OS, filtrar, pesquisar e editar,
+Os campos das OS serão: Ativo(string), Titulo(string), Data Solicitação(Date DD/MM/YYYY), Status Solicitante(string), Nome do Solicitante(string), Empresa(string), Status Atendimento(string), Observação(string).
+
+Terá também uma Pagina com uma lista de Empresas terceirizadas cadastradas onde será possivel cadastrar, filtrar e editar.
+
+Gostaria que estas paginas fossem separadas de forma coerente, por favor me guie para criar está aplicação.
