@@ -21,17 +21,22 @@ import {
 import { Input } from "@/components/ui/input";
 
 // Schema de validação para a alteração de senha
-const changePasswordFormSchema = z.object({
-  currentPassword: z.string().min(1, "A senha atual é obrigatória."),
-  newPassword: z.string().min(8, "A nova senha deve ter no mínimo 8 caracteres."),
-  confirmPassword: z.string().min(8, "Confirme sua nova senha."),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "As senhas não coincidem.",
-  path: ["confirmPassword"],
-}).refine((data) => data.currentPassword !== data.newPassword, {
-  message: "A nova senha não pode ser igual à senha atual.",
-  path: ["newPassword"],
-});
+const changePasswordFormSchema = z
+  .object({
+    currentPassword: z.string().min(1, "A senha atual é obrigatória."),
+    newPassword: z
+      .string()
+      .min(8, "A nova senha deve ter no mínimo 8 caracteres."),
+    confirmPassword: z.string().min(8, "Confirme sua nova senha."),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "As senhas não coincidem.",
+    path: ["confirmPassword"],
+  })
+  .refine((data) => data.currentPassword !== data.newPassword, {
+    message: "A nova senha não pode ser igual à senha atual.",
+    path: ["newPassword"],
+  });
 
 export default function UserProfilePage() {
   const router = useRouter();
@@ -46,7 +51,9 @@ export default function UserProfilePage() {
     },
   });
 
-  const onPasswordChangeSubmit = async (values: z.infer<typeof changePasswordFormSchema>) => {
+  const onPasswordChangeSubmit = async (
+    values: z.infer<typeof changePasswordFormSchema>
+  ) => {
     try {
       const response = await fetch("/api/users/me/password", {
         method: "PUT",
@@ -81,31 +88,49 @@ export default function UserProfilePage() {
     );
   }
 
-  if (status === "unauthenticated" || !(session?.user?.email as string)?.endsWith("@starnav.com.br")) {
+  if (
+    status === "unauthenticated" ||
+    !(session?.user?.email as string)?.endsWith("@starnav.com.br")
+  ) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
         <FrownIcon className="h-20 w-20 text-red-400 mb-4" />
         <h2 className="text-2xl font-bold text-red-700 mb-2">Acesso Negado</h2>
-        <p className="text-gray-500 mb-6">Você precisa estar logado para acessar esta página.</p>
-        <Button onClick={() => router.push("/auth/login")}>Ir para Login</Button>
+        <p className="text-gray-500 mb-6">
+          Você precisa estar logado para acessar esta página.
+        </p>
+        <Button onClick={() => router.push("/auth/login")}>
+          Ir para Login
+        </Button>
       </div>
     );
   }
 
   return (
     <div className="container max-w-lg mx-auto py-8">
-      <SiteHeader />
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-center">Meu Perfil</h1>
-        <p className="text-center text-gray-500">Gerencie suas informações de usuário</p>
+        <p className="text-center text-gray-500">
+          Gerencie suas informações de usuário
+        </p>
       </div>
       <div className="space-y-6 bg-white rounded-lg shadow p-6">
         <div className="space-y-2">
           <h3 className="font-semibold text-lg">Informações Pessoais</h3>
-          <p><strong>Nome:</strong> {session?.user?.name || "N/A"}</p>
-          <p><strong>Email:</strong> {session?.user?.email}</p>
-          <p><strong>Cargo:</strong> {session?.user?.role?.replace(/_/g, ' ') || "N/A"}</p>
-          <p><strong>Setor:</strong> {session?.user?.sector?.replace(/_/g, ' ') || "N/A"}</p>
+          <p>
+            <strong>Nome:</strong> {session?.user?.name || "N/A"}
+          </p>
+          <p>
+            <strong>Email:</strong> {session?.user?.email}
+          </p>
+          <p>
+            <strong>Cargo:</strong>{" "}
+            {session?.user?.role?.replace(/_/g, " ") || "N/A"}
+          </p>
+          <p>
+            <strong>Setor:</strong>{" "}
+            {session?.user?.sector?.replace(/_/g, " ") || "N/A"}
+          </p>
         </div>
 
         <hr className="my-4" />
@@ -113,7 +138,10 @@ export default function UserProfilePage() {
         <div className="space-y-4">
           <h3 className="font-semibold text-lg">Alterar Senha</h3>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onPasswordChangeSubmit)} className="space-y-4">
+            <form
+              onSubmit={form.handleSubmit(onPasswordChangeSubmit)}
+              className="space-y-4"
+            >
               <FormField
                 control={form.control}
                 name="currentPassword"
@@ -153,7 +181,11 @@ export default function UserProfilePage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={form.formState.isSubmitting} className="w-full">
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                className="w-full"
+              >
                 {form.formState.isSubmitting ? "Alterando..." : "Alterar Senha"}
               </Button>
             </form>
